@@ -1,0 +1,26 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# dev / editor noise
+*.log
+dev.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# python (desktop companion)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.exe

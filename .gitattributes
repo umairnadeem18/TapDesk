@@ -1,0 +1,10 @@
+# Normalise line endings so diffs stay clean across machines.
+* text=auto eol=lf
+
+# Keep these as-is
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+*.apk binary
+*.exe binary
