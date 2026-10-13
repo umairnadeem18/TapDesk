@@ -1,0 +1,18 @@
+{
+  "name": "tapdesk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TapDesk — turn your phone into a wireless mouse, slide clicker and keyboard for your PC",
+  "workspaces": [
+    "website"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace website",
+    "build": "npm run build --workspace website",
+    "start": "npm run start --workspace website",
+    "lint": "npm run lint --workspace website"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
