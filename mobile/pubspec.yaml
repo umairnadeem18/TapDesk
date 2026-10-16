@@ -39,14 +39,20 @@ dependencies:
   # Keeps the screen awake while connected (PRD: optional, on by default).
   wakelock_plus: ^1.2.8
 
-  # Bundled fonts. Pairing happens on a local network that may have no
-  # internet, so the app must render identically offline.
-  google_fonts: ^6.2.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+# path_provider_android 2.3.0 moved to the `jni` package, which compiles C++
+# and therefore requires the full Android NDK (~1 GB) at build time. TapDesk
+# compiles no native code, and 2.2.23 is the last release before that rewrite.
+# Pinning it keeps the NDK out of the build entirely.
+#
+# Revisit once a newer path_provider_android ships prebuilt binaries - do not
+# just delete this and hope.
+dependency_overrides:
+  path_provider_android: 2.2.23
 
 flutter:
   uses-material-design: true

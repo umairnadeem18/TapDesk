@@ -7,7 +7,13 @@ plugins {
 android {
     namespace = "app.tapdesk.tapdesk_mobile"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+
+    // ndkVersion is deliberately NOT set. TapDesk compiles no native code of
+    // its own - every plugin we use ships prebuilt .so files - so the NDK is
+    // never needed. Leaving Flutter's generated `ndkVersion = ...` in place
+    // made AGP try to auto-install NDK 28.x, which failed on this machine and
+    // failed the whole build for no useful reason. Removing it saves a ~1 GB
+    // download on a slow connection.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

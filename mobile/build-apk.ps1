@@ -26,7 +26,13 @@ Set-Location 'D:\Development\TAPDESK\mobile'
 Remove-Item $log -ErrorAction SilentlyContinue
 
 Say '=== debug APK build started ==='
-& flutter build apk --debug 2>&1 |
+
+# Run through cmd so stderr lands in the log as plain text. Invoking the exe
+# directly made PowerShell wrap every stderr line in a RemoteException record,
+# which buried the real Gradle error.
+$cmd = 'flutter build apk --debug 2>&1'
+$raw = & cmd.exe /c $cmd 2>&1 | ForEach-Object { "$_" }
+$raw | Where-Object { $_ -notmatch 'RemoteException' -and $_.Trim() -ne '' } |
   ForEach-Object { Add-Content -Path $log -Value $_ }
 $code = $LASTEXITCODE
 Say "flutter build apk --debug exited with $code"
