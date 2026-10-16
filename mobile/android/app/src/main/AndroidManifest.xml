@@ -1,6 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Local network socket to the companion. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Tells the app when the Wi-Fi dropped, so it can reconnect instead of
+         appearing stuck on "Connected". -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- QR scanning only. The rationale screen is shown before this prompt. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Haptic feedback on every Slides and Mouse press. -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <!-- The camera is not required to install: a user may pair by typing the
+         code manually. Keeping it optional avoids Play Store filtering the app
+         out for users with no camera. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
     <application
-        android:label="tapdesk_mobile"
+        android:label="TapDesk"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
