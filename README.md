@@ -17,12 +17,14 @@ This is a monorepo. Each directory is deployed or shipped independently.
 |---|---|---|
 | `website/` | Marketing site — home, about, services, download, privacy, terms | Next.js 16, Tailwind CSS v4, TypeScript |
 | `mobile/` | Phone controller: Slides / Mouse / Keyboard tabs | Flutter (Dart) — *not started* |
-| `desktop/` | Companion that shows the QR code and drives the real mouse and keyboard | Python 3.11+ — *not started* |
-| `docs/` | Product requirements, protocol spec, privacy policy source | Markdown |
+| `companion/` | Companion that shows the QR code and drives the real mouse and keyboard | Python 3.12 — *not started* |
+| `docs/` | Product requirements, protocol spec, design system, build plan | Markdown |
 
 ## Current status
 
 - [x] **Website** — built and building clean. See [`website/README.md`](website/README.md).
+- [x] **Toolchain** — Flutter, Android SDK, JDK, Python 3.12, Git, all on `D:`. Verify with `D:\DevTools\verify.ps1`.
+- [x] **Protocol v1** — [`docs/protocol.md`](docs/protocol.md) and [`docs/design-system.md`](docs/design-system.md) frozen.
 - [ ] **Desktop companion** — WebSocket server, QR pairing, input simulation.
 - [ ] **Mobile app** — QR scanner, analog stick, slide buttons, on-screen keyboard.
 - [ ] Release pipeline — signed APK and Windows installer, GitHub Releases.
