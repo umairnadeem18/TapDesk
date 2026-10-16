@@ -30,11 +30,46 @@ This is a monorepo. Each directory is deployed or shipped independently.
 
 ## Getting started
 
+### Website
+
 ```bash
 cd website
 npm install
 npm run dev      # http://localhost:3000
 ```
+
+### Toolchain (already installed on the development PC)
+
+Everything third-party lives on `D:` under `D:\DevTools`, one folder per tool.
+To remove a tool, delete its folder and re-run `D:\DevTools\env.ps1`.
+
+| Path | What it is |
+|---|---|
+| `D:\DevTools\flutter` | Flutter 3.47.7 + Dart 3.13.5 |
+| `D:\DevTools\jdk-17` | Temurin JDK 17 — required by the Android Gradle Plugin |
+| `D:\DevTools\android-sdk` | Android SDK (platform-tools, platform 36, build-tools 36) |
+| `D:\DevTools\python312` | Python 3.12 — base for the companion venv |
+| `D:\DevTools\git` | Portable Git |
+| `D:\DevTools\gradle`, `D:\DevTools\pub-cache` | build caches, kept off `C:` |
+| `D:\DevTools\downloads` | installer archives, safe to delete |
+
+Check the whole setup at any time:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\DevTools\verify.ps1
+```
+
+### Desktop companion
+
+The companion uses its own virtualenv, so the machine-wide Python does not
+matter — always run it through the venv:
+
+```bash
+companion\.venv\Scripts\python.exe -m companion
+```
+
+Full setup notes, including two gotchas that cost us time, are in
+[`docs/PLAN.md`](docs/PLAN.md).
 
 ## How the product works
 
