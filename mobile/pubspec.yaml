@@ -38,6 +38,9 @@ dependencies:
 
   # Keeps the screen awake while connected (PRD: optional, on by default).
   wakelock_plus: ^1.2.8
+  # SHA-256 of the companion's certificate, for pinning. Pure Dart so the
+  # fingerprint check runs identically in a unit test and on a phone.
+  crypto: ^3.0.6
 
   # NOTE: no haptics package. The `vibration` plugin hard-codes
   # compileSdkVersion 33 and pulls AGP 7.4.0 into a project running AGP 9.1.0,

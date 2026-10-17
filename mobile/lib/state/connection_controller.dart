@@ -48,6 +48,26 @@ extension ConnectionStatusX on ConnectionStatus {
       this == ConnectionStatus.handshaking ||
       this == ConnectionStatus.reconnecting;
 
+  /// Whether losing the socket from this state is worth reconnecting.
+  ///
+  /// Deliberately wider than [isRetryable]. That one means "a scheduled retry
+  /// is still in progress"; this one asks "would trying again stand a chance",
+  /// and the commonest case by far is the socket dropping while
+  /// [ConnectionStatus.connected] - a phone leaving Wi-Fi range, a laptop
+  /// sleeping. Treating that as terminal would mean the user had to pair again
+  /// every time the connection flickered.
+  ///
+  /// The states it excludes all need something from the user before another
+  /// attempt could differ: there was nothing to reconnect to, or the attempt
+  /// failed in a way that only a fresh scan or a new decision can change.
+  bool get canRetryAfterDrop => switch (this) {
+        ConnectionStatus.idle => false,
+        ConnectionStatus.denied => false,
+        ConnectionStatus.revoked => false,
+        ConnectionStatus.failed => false,
+        _ => true,
+      };
+
   /// Colour of the connection dot in the app bar.
   ///
   /// Green only ever means connected, per the design system.
