@@ -1,0 +1,24 @@
+...FF....................................................FF............. [ 49%]
+........................................................................ [ 99%]
+.                                                                        [100%]
+================================== FAILURES ===================================
+E   ValueError: a coroutine was expected, got False
+------------------------------ Captured log call ------------------------------
+WARNING  tapdesk:app.py:84 headless: refusing, there is nobody to ask
+D:\DevTools\python312\Lib\asyncio\runners.py:89: ValueError: a coroutine was expected, got False
+E   TypeError: attribute name must be string, not 'Button'
+D:\Development\TAPDESK\companion\tapdesk\input\simulator.py:220: TypeError: attribute name must be string, not 'Button'
+E   AssertionError: no desktop mapping for: ['apostrophe', 'backslash', 'comma', 'equal', 'grave', 'lbracket', 'minus', 'period', 'rbracket', 'semicolon', 'slash']
+    assert ['apostrophe'...bracket', ...] == []
+      
+      Left contains 11 more items, first extra item: 'apostrophe'
+      Use -v to get more diff
+D:\Development\TAPDESK\companion\tests\test_input.py:257: AssertionError: no desktop mapping for: ['apostrophe', 'backslash', 'comma', 'equal', 'grave', 'lbracket', 'minus', 'period', 'rbracket', 'semicolon', 'slash']
+E   TypeError: attribute name must be string, not 'Key'
+D:\Development\TAPDESK\companion\tests\test_input.py:269: TypeError: attribute name must be string, not 'Key'
+=========================== short test summary info ===========================
+FAILED tests/test_app.py::TestCompanion::test_headless_refuses_pairing_rather_than_allowing_it
+FAILED tests/test_app.py::TestCompanion::test_disconnect_releases_everything_held
+FAILED tests/test_input.py::TestKeyMapping::test_every_protocol_key_can_reach_the_desktop
+FAILED tests/test_input.py::TestKeyMapping::test_the_named_mappings_exist_on_the_pynput_controller
+4 failed, 141 passed in 5.75s

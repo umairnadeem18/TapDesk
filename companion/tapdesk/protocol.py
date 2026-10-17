@@ -106,15 +106,30 @@ CLICK_ACTIONS: Final = frozenset({"down", "up", "click", "double"})
 KEY_ACTIONS: Final = frozenset({"press", "release", "tap"})
 SLIDE_ACTIONS: Final = frozenset({"next", "prev", "start", "end", "blank"})
 
-#: How a slide action becomes real keys, section 4.4. The phone sends only the
-#: action; deciding what it means is this side's job, because PowerPoint,
+#: How a slide action becomes a real key, section 4.4. The phone sends only
+#: the action; deciding what it means is this side's job, because PowerPoint,
 #: Impress and a PDF viewer all disagree about what "next" is.
+#:
+#: ONE key is sent, not both. The first value is the one performed; the second
+#: is only a fallback to try if the first demonstrably does nothing, which
+#: cannot be detected from here. Pressing both would advance the deck twice
+#: per click, which is worse than pressing the wrong single key.
 SLIDE_KEYS: Final = {
-    "next": ("pgdn", "right"),
-    "prev": ("pgup", "left"),
-    "start": ("f5",),
-    "end": ("esc",),
-    "blank": ("b",),
+    "next": "pgdn",
+    "prev": "pgup",
+    "start": "f5",
+    "end": "esc",
+    "blank": "b",
+}
+
+#: What to try when the primary key does nothing, chosen by the user in
+#: settings. Referenced, never sent automatically.
+SLIDE_FALLBACKS: Final = {
+    "next": "right",
+    "prev": "left",
+    "start": "f5",
+    "end": "esc",
+    "blank": "b",
 }
 
 #: Chord sizes allowed, section 4.3.

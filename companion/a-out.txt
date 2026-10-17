@@ -1,0 +1,19 @@
+...FF....FF............................................................. [ 50%]
+........................................................................ [100%]
+================================== FAILURES ===================================
+E   ValueError: a coroutine was expected, got False
+------------------------------ Captured log call ------------------------------
+WARNING  tapdesk:app.py:84 headless: refusing, there is nobody to ask
+D:\DevTools\python312\Lib\asyncio\runners.py:89: ValueError: a coroutine was expected, got False
+E   AttributeError: 'Controller' object has no attribute 'ctrl'
+D:\Development\TAPDESK\companion\tapdesk\input\simulator.py:233: AttributeError: 'Controller' object has no attribute 'ctrl'
+E   AttributeError: 'MainWindow' object has no attribute '_last_link'
+D:\Development\TAPDESK\companion\tapdesk\ui\window.py:229: AttributeError: 'MainWindow' object has no attribute '_last_link'
+E   AttributeError: 'MainWindow' object has no attribute '_last_link'
+D:\Development\TAPDESK\companion\tapdesk\ui\window.py:229: AttributeError: 'MainWindow' object has no attribute '_last_link'
+=========================== short test summary info ===========================
+FAILED tests/test_app.py::TestCompanion::test_headless_refuses_pairing_rather_than_allowing_it
+FAILED tests/test_app.py::TestCompanion::test_disconnect_releases_everything_held
+FAILED tests/test_app.py::TestWindow::test_the_window_builds_and_shows_a_session
+FAILED tests/test_app.py::TestWindow::test_the_pin_is_hidden_until_it_is_needed
+4 failed, 140 passed in 8.09s

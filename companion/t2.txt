@@ -1,0 +1,20 @@
+F..................F.......F...                                          [100%]
+================================== FAILURES ===================================
+E   AssertionError: assert [('key', 'pgd...right', 'up')] == [('key', 'pgd...'pgdn', 'up')]
+      
+      Left contains 2 more items, first extra item: ('key', 'right', 'down')
+      Use -v to get more diff
+D:\Development\TAPDESK\companion\tests\test_input.py:32: AssertionError: assert [('key', 'pgd...right', 'up')] == [('key', 'pgd...'pgdn', 'up')]
+E   assert 25 < 0
+D:\Development\TAPDESK\companion\tests\test_input.py:136: assert 25 < 0
+E   AssertionError: assert set() == {'ctrl'}
+      
+      Extra items in the right set:
+      'ctrl'
+      Use -v to get more diff
+D:\Development\TAPDESK\companion\tests\test_input.py:209: AssertionError: assert set() == {'ctrl'}
+=========================== short test summary info ===========================
+FAILED tests/test_input.py::TestSlide::test_next_sends_pagedown - AssertionEr...
+FAILED tests/test_input.py::TestStick::test_a_deflected_stick_moves_in_that_direction
+FAILED tests/test_input.py::TestReleasing::test_release_all_lets_go_of_everything_held
+3 failed, 28 passed in 0.57s
