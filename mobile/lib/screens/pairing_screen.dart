@@ -203,12 +203,21 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Text('Pair with a computer', style: TapDeskText.button),
           ),
-          IconButton(
-            tooltip: 'Close',
-            onPressed: onClose,
-            icon: const Icon(Icons.close),
-            color: TapDeskColors.textMuted,
-          ),
+          // Only offered when there is somewhere to go back to.
+          //
+          // On a fresh install this screen is the home route, so `maybePop`
+          // had nothing to pop and the button did nothing at all - a visible
+          // control that silently failed, which is the worst kind of bug in a
+          // UI. Either it works or it is not drawn.
+          if (Navigator.of(context).canPop())
+            IconButton(
+              tooltip: 'Close',
+              onPressed: onClose,
+              icon: const Icon(Icons.close),
+              color: TapDeskColors.textMuted,
+            ),
+          if (!Navigator.of(context).canPop())
+            const SizedBox(width: TapDeskSpace.s4),
         ],
       ),
     );
