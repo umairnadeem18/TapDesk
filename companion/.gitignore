@@ -1,0 +1,4 @@
+# Companion test output
+pytest-out.txt
+pytest-err.txt
+*.tmp

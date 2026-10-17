@@ -45,6 +45,7 @@ E_BAD_FIELD: Final = "E_BAD_FIELD"
 E_TOO_LARGE: Final = "E_TOO_LARGE"
 E_RATE_LIMITED: Final = "E_RATE_LIMITED"
 E_WRONG_FP: Final = "E_WRONG_FP"
+E_AUTH_FAILED_KEY: Final = "E_BAD_TOKEN"
 E_UNSAFE: Final = "E_UNSAFE"
 
 # Close codes, section 6.2.
