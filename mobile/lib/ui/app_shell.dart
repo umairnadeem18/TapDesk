@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/connection_controller.dart';
+import '../screens/slides_tab.dart';
 import '../state/pairing_store.dart';
 import '../theme/tokens.dart';
 import 'connection_indicators.dart';
@@ -57,12 +58,19 @@ class _AppShellState extends State<AppShell> {
             child: IndexedStack(
               index: _index,
               children: [
-                for (final name in _tabs)
-                  _TabPlaceholder(
-                    name: name,
-                    enabled: enabled,
-                    status: info.status,
-                  ),
+                // Slides is built. Mouse and Keyboard land next; each replaces
+                // one placeholder, so the shell never changes shape again.
+                const SlidesTab(),
+                _TabPlaceholder(
+                  name: 'Mouse',
+                  enabled: enabled,
+                  status: info.status,
+                ),
+                _TabPlaceholder(
+                  name: 'Keyboard',
+                  enabled: enabled,
+                  status: info.status,
+                ),
               ],
             ),
           ),

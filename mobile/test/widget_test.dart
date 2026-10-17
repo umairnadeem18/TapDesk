@@ -89,6 +89,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Not connected'), findsOneWidget);
+
+    // Slides is a real screen now, so it shows its controls and relies on the
+    // banner plus inert buttons rather than placeholder text.
+    expect(find.text('Next'), findsOneWidget);
+
+    // Mouse is not built yet, so it still explains itself.
+    await tester.tap(find.text('Mouse'));
+    await tester.pumpAndSettle();
     expect(find.text('Connect to a PC to use this tab.'), findsOneWidget);
   });
 
