@@ -34,10 +34,16 @@ dependencies:
   shared_preferences: ^2.3.3
 
   # Vibration for the haptics requirement in docs/design-system.md.
-  vibration: ^2.0.1
+  # Removed - see the note on wakelock_plus below.
 
   # Keeps the screen awake while connected (PRD: optional, on by default).
   wakelock_plus: ^1.2.8
+
+  # NOTE: no haptics package. The `vibration` plugin hard-codes
+  # compileSdkVersion 33 and pulls AGP 7.4.0 into a project running AGP 9.1.0,
+  # which fails the build with 15 AAR metadata errors. Flutter's built-in
+  # HapticFeedback covers light/medium/heavy impact, which is all
+  # design-system.md asks for. See lib/ui/haptics.dart.
 
 dev_dependencies:
   flutter_test:

@@ -30,10 +30,16 @@ Say '=== debug APK build started ==='
 # Run through cmd so stderr lands in the log as plain text. Invoking the exe
 # directly made PowerShell wrap every stderr line in a RemoteException record,
 # which buried the real Gradle error.
-$cmd = 'flutter build apk --debug 2>&1'
-$raw = & cmd.exe /c $cmd 2>&1 | ForEach-Object { "$_" }
-$raw | Where-Object { $_ -notmatch 'RemoteException' -and $_.Trim() -ne '' } |
-  ForEach-Object { Add-Content -Path $log -Value $_ }
+#
+# Output is written line by line as it arrives. Collecting it into a variable
+# first (the obvious way to do this) buffers the whole build, so the log stays
+# empty for the entire run and you cannot tell progress from a hang.
+& cmd.exe /c 'flutter build apk --debug 2>&1' | ForEach-Object {
+  $line = "$_"
+  if ($line -notmatch 'RemoteException' -and $line.Trim() -ne '') {
+    Add-Content -Path $log -Value $line
+  }
+}
 $code = $LASTEXITCODE
 Say "flutter build apk --debug exited with $code"
 
