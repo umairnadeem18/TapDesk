@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --include=optional && npm install --no-save lightningcss-linux-x64-gnu@1.32.0 lightningcss-linux-x64-musl@1.32.0"
+}
