@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../state/connection_controller.dart';
+import '../state/pairing_store.dart';
 import '../theme/tokens.dart';
 import 'connection_indicators.dart';
 
@@ -11,66 +13,70 @@ import 'connection_indicators.dart';
 /// behaviour, the connection dot, the banner and the disable-when-not-connected
 /// rule all work, because those are the parts a reviewer signs off on first.
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.connection});
-
-  final ConnectionController connection;
+  const AppShell({super.key});
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
+  /// Which tab is showing. Held here rather than derived, so switching tabs
+  /// does not rebuild into a different tab just because the connection
+  /// changed while the user was on it.
   int _index = 0;
 
   static const List<String> _tabs = ['Slides', 'Mouse', 'Keyboard'];
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: widget.connection,
-      builder: (context, _) {
-        final info = widget.connection.info;
-        final enabled = info.status.isConnected;
+    final connection = context.watch<ConnectionController>();
+    final store = context.watch<PairingStore>();
+    final info = connection.info;
+    final enabled = info.status.isConnected;
 
-        return Scaffold(
-          backgroundColor: TapDeskColors.background,
-          appBar: _AppBar(info: info),
-          body: Column(
-            children: [
-              ConnectionBanner(status: info.status, error: info.lastError),
-              _TabBar(
-                tabs: _tabs,
-                index: _index,
-                enabled: enabled,
-                onChanged: (i) => setState(() => _index = i),
-              ),
-              // Expanded so the tab body owns the remaining height and the
-              // keyboard can shrink it correctly with adjustResize.
-              Expanded(
-                child: IndexedStack(
-                  index: _index,
-                  children: [
-                    for (final name in _tabs)
-                      _TabPlaceholder(
-                        name: name,
-                        enabled: enabled,
-                        status: info.status,
-                      ),
-                  ],
-                ),
-              ),
-            ],
+    // While disconnected there is no live name from the PC, but we still know
+    // which machine we are about to connect to - showing it tells the user
+    // which paired computer these controls will drive.
+    final pcName = info.pcName ?? store.mostRecent?.name;
+
+    return Scaffold(
+      backgroundColor: TapDeskColors.background,
+      appBar: _AppBar(info: info, pcName: pcName),
+      body: Column(
+        children: [
+          ConnectionBanner(status: info.status, error: info.lastError),
+          _TabBar(
+            tabs: _tabs,
+            index: _index,
+            enabled: enabled,
+            onChanged: (i) => setState(() => _index = i),
           ),
-        );
-      },
+          // Expanded so the tab body owns the remaining height and the
+          // keyboard can shrink it correctly with adjustResize.
+          Expanded(
+            child: IndexedStack(
+              index: _index,
+              children: [
+                for (final name in _tabs)
+                  _TabPlaceholder(
+                    name: name,
+                    enabled: enabled,
+                    status: info.status,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _AppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _AppBar({required this.info});
+  const _AppBar({required this.info, required this.pcName});
 
   final ConnectionInfo info;
+  final String? pcName;
 
   @override
   Size get preferredSize => const Size.fromHeight(56);
@@ -86,13 +92,13 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
         children: [
           Expanded(
             child: Text(
-              info.pcName ?? 'TapDesk',
+              pcName ?? 'TapDesk',
               // Truncated rather than wrapped: a long PC name must not push
               // the connection indicator off a narrow screen.
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TapDeskText.bodyText.copyWith(
-                color: info.pcName == null
+                color: pcName == null
                     ? TapDeskColors.textMuted
                     : TapDeskColors.text,
               ),
