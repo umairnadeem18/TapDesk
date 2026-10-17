@@ -217,7 +217,14 @@ class InputSimulator:
                 "right": mouse.Button.right,
                 "middle": mouse.Button.middle,
             }[name]
-            getattr(mouse.Controller(), button)(state == "down")
+            # press/release take a Button member. Looking the button up as an
+            # *attribute name* - getattr(controller, Button.left) - raises
+            # TypeError, so every click raised and no click worked at all.
+            controller = mouse.Controller()
+            if state == "down":
+                controller.press(button)
+            else:
+                controller.release(button)
         elif kind == "key":
             self._press_key(action[1], action[2])
         elif kind == "text":

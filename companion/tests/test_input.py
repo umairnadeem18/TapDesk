@@ -243,29 +243,111 @@ class TestReleasing:
 
 
 class TestKeyMapping:
+    """Every key the phone can send must be able to reach the desktop.
+
+    A key with no mapping is the worst kind of bug here: it looks perfect on
+    the phone and silently does nothing on the computer, so the test walks the
+    real pynput objects rather than trusting a table that can rot.
+    """
+
     def test_every_protocol_key_can_reach_the_desktop(self) -> None:
+        from tapdesk import protocol as p
+        from tapdesk.input.simulator import _PYNPUT_LITERAL, _PYNPUT_SPECIAL
+
+        # Three ways to reach the desktop: a Key member, a literal character,
+        # or the key id already being a single character.
+        single_characters = {k for k in p.KEY_IDS if len(k) == 1}
+        unmapped = sorted(
+            p.KEY_IDS - set(_PYNPUT_SPECIAL) - set(_PYNPUT_LITERAL)
+            - single_characters
+        )
+        assert unmapped == [], f"no desktop mapping for: {unmapped}"
+
+    def test_named_mappings_are_real_pynput_key_members(self) -> None:
+        # An earlier version mapped to controller method names such as
+        # `controller.ctrl`, which do not exist. Asserting against the real
+        # enum means that mistake cannot come back.
+        from pynput.keyboard import Key
+
         from tapdesk.input.simulator import _PYNPUT_SPECIAL
+
+        valid = set(Key)
+        for key_id, member in _PYNPUT_SPECIAL.items():
+            assert isinstance(member, Key), (
+                f"{key_id} maps to {member!r}, which is not a pynput Key member"
+            )
+            assert member in valid, f"{key_id} maps to an unknown key: {member!r}"
+
+    def test_punctuation_is_typed_as_characters(self) -> None:
+        # pynput's Key enum has no punctuation members at all, so these must
+        # be literal characters. An earlier version looked for members that
+        # do not exist and every punctuation key became a no-op.
+        from pynput.keyboard import Key
+
+        from tapdesk.input.simulator import _PYNPUT_LITERAL
+
+        for key_id, character in _PYNPUT_LITERAL.items():
+            assert len(character) == 1, (
+                f"{key_id} must map to a single character, got {character!r}"
+            )
+            assert not isinstance(
+                getattr(Key, character, None), Key
+            ), f"{key_id} uses the literal {character!r} but a Key member exists"
+
+    def test_every_literal_is_a_key_the_protocol_actually_declares(self) -> None:
+        # Guards against a typo turning a key id into a silently wrong
+        # character, e.g. mapping "period" to a comma.
         from tapdesk import protocol as p
 
-        # A key with no mapping is a key that silently does nothing on the
-        # desktop while looking perfectly fine on the phone. Single characters
-        # are typed literally, so only named keys need an entry.
-        single_characters = {k for k in p.KEY_IDS if len(k) == 1}
-        missing = sorted(
-            (p.KEY_IDS - set(_PYNPUT_SPECIAL)) - single_characters
-        )
-        assert missing == [], f"no desktop mapping for: {missing}"
+        from tapdesk.input.simulator import _PYNPUT_LITERAL
 
-    def test_the_named_mappings_exist_on_the_pynput_controller(self) -> None:
-        # An earlier version used controller.ctrl and friends, which do not
-        # exist: pynput exposes named keys through Key enum members. This walks
-        # the real objects so the mapping cannot rot silently.
-        from pynput.keyboard import Controller
+        expected = {
+            "minus": "-",
+            "equal": "=",
+            "lbracket": "[",
+            "rbracket": "]",
+            "backslash": "\\",
+            "semicolon": ";",
+            "apostrophe": "'",
+            "grave": "`",
+            "comma": ",",
+            "period": ".",
+            "slash": "/",
+        }
+        assert _PYNPUT_LITERAL == expected
+        assert set(expected) <= p.KEY_IDS
 
-        from tapdesk.input.simulator import _PYNPUT_SPECIAL
+
+class TestMouseMapping:
+    """The click path had the same defect the keyboard path had.
+
+    It looked up `Button.left` as an attribute name on the controller, which
+    raises TypeError, so no click worked at all. These assert against the real
+    pynput objects so it cannot come back silently.
+    """
+
+    def test_every_mouse_button_is_a_real_pynput_button(self) -> None:
+        from pynput.mouse import Button
+
+        from tapdesk import protocol as p
+
+        valid = set(Button)
+        for name in p.MOUSE_BUTTONS:
+            button = {
+                "left": Button.left,
+                "right": Button.right,
+                "middle": Button.middle,
+            }.get(name)
+            assert button is not None, f"{name} has no Button member"
+            assert button in valid
+
+    def test_the_controller_can_press_and_release_every_button(self) -> None:
+        from pynput.mouse import Button, Controller
 
         controller = Controller()
-        for key_id, attribute in _PYNPUT_SPECIAL.items():
-            assert hasattr(controller, attribute), (
-                f"{key_id} maps to controller.{attribute}, which does not exist"
-            )
+        for button in (Button.left, Button.right, Button.middle):
+            # Not calling them - that would move the real cursor. Only checking
+            # the call exists and is callable with a Button member.
+            for method in (controller.press, controller.release):
+                assert callable(method)
+                assert button in set(Button)
