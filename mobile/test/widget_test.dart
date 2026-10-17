@@ -72,13 +72,13 @@ void main() {
 
     // Switching tabs works even while disconnected: a user must be able to
     // see the "not connected" state on each tab.
-    await tester.tap(find.text('Keyboard'));
+    await tester.tap(find.text('Slides'));
     await tester.pumpAndSettle();
-    expect(find.text('Keyboard tab'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
 
     await tester.tap(find.text('Mouse'));
     await tester.pumpAndSettle();
-    expect(find.text('Mouse tab'), findsOneWidget);
+    expect(find.byIcon(Icons.touch_app_outlined), findsOneWidget);
   });
 
   testWidgets('disconnected explains itself rather than looking broken',
@@ -94,8 +94,8 @@ void main() {
     // banner plus inert buttons rather than placeholder text.
     expect(find.text('Next'), findsOneWidget);
 
-    // Mouse is not built yet, so it still explains itself.
-    await tester.tap(find.text('Mouse'));
+    // Keyboard is not built yet, so it still explains itself.
+    await tester.tap(find.text('Keyboard'));
     await tester.pumpAndSettle();
     expect(find.text('Connect to a PC to use this tab.'), findsOneWidget);
   });
