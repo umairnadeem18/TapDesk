@@ -18,6 +18,23 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Redirected build and test output. Written by the detached verification runs,
+# and swept into a commit by an editor's auto-commit more than once, so they
+# are excluded by pattern rather than deleted by hand each time.
+*-out.txt
+*-err.txt
+pytest-out.txt
+pytest-err.txt
+x.txt
+xe.txt
+y*.txt
+z*.txt
+h*.txt
+a[0-9].txt
+a[0-9]e.txt
+p1.txt
+p1e.txt
+
 # python (desktop companion)
 __pycache__/
 *.py[cod]

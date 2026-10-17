@@ -1,3 +1,0 @@
-/C:/Users/Umair/AppData/Local/Temp/flutter_tools.b51d065a/flutter_test_listener.f1fbf2a6/listener.dart:21:21: Error: Undefined name 'main'.
-  await Future(test.main);
-                    ^^^^
