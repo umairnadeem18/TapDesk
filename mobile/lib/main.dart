@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'state/connection_controller.dart';
 import 'state/pairing_store.dart';
+import 'state/preview_mode.dart';
 import 'theme/tokens.dart';
 import 'transport/event_sink.dart';
 import 'ui/app_shell.dart';
@@ -35,6 +36,7 @@ class TapDeskApp extends StatelessWidget {
         // Loaded once at startup so a paired phone does not flash the pairing
         // screen before remembering what it knows.
         ChangeNotifierProvider(create: (_) => PairingStore()..load()),
+        ChangeNotifierProvider(create: (_) => PreviewMode()),
         Provider<EventSink>.value(value: sink ?? RecordingEventSink()),
       ],
       child: MaterialApp(
@@ -63,6 +65,11 @@ class _Root extends StatelessWidget {
     final hasPaired = context.select<PairingStore, bool>(
       (store) => store.hasPairedDevices,
     );
+    final preview = context.select<PreviewMode, bool>((p) => p.isActive);
+
+    // Preview wins over pairing: the point of it is to reach the tabs when
+    // there is no PC and no pairing.
+    if (preview) return const AppShell(preview: true);
 
     if (!hasPaired) {
       return PairingScreen(onPaired: (_) => _openShell(context));

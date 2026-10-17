@@ -5,6 +5,7 @@ import '../state/connection_controller.dart';
 import '../screens/mouse_tab.dart';
 import '../screens/slides_tab.dart';
 import '../state/pairing_store.dart';
+import '../state/preview_mode.dart';
 import '../theme/tokens.dart';
 import 'connection_indicators.dart';
 
@@ -15,7 +16,10 @@ import 'connection_indicators.dart';
 /// behaviour, the connection dot, the banner and the disable-when-not-connected
 /// rule all work, because those are the parts a reviewer signs off on first.
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.preview = false});
+
+  /// Show the controller without a PC. Debug builds only - see PreviewMode.
+  final bool preview;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -34,7 +38,7 @@ class _AppShellState extends State<AppShell> {
     final connection = context.watch<ConnectionController>();
     final store = context.watch<PairingStore>();
     final info = connection.info;
-    final enabled = info.status.isConnected;
+    final enabled = info.status.isConnected || widget.preview;
 
     // While disconnected there is no live name from the PC, but we still know
     // which machine we are about to connect to - showing it tells the user
@@ -46,6 +50,7 @@ class _AppShellState extends State<AppShell> {
       appBar: _AppBar(info: info, pcName: pcName),
       body: Column(
         children: [
+          if (widget.preview) const PreviewBanner(),
           ConnectionBanner(status: info.status, error: info.lastError),
           _TabBar(
             tabs: _tabs,
@@ -72,6 +77,53 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Says, unmistakably, that nothing is connected.
+///
+/// Preview mode enables the controls so the design can be judged on a device,
+/// which is the whole point. It must therefore be impossible to mistake for a
+/// working connection - the design system's rule is that the user is never
+/// left guessing whether their input is going anywhere.
+class PreviewBanner extends StatelessWidget {
+  const PreviewBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(
+            TapDeskSpace.s4, TapDeskSpace.s2, TapDeskSpace.s2, TapDeskSpace.s2),
+        color: TapDeskColors.surface,
+        child: Row(
+          children: [
+            const Icon(Icons.visibility_outlined,
+                size: 18, color: TapDeskColors.warning),
+            const SizedBox(width: TapDeskSpace.s3),
+            Expanded(
+              child: Text(
+                'Preview — no computer connected. Buttons work, nothing is sent.',
+                style: TapDeskText.label,
+              ),
+            ),
+            TextButton(
+              // No navigation here: _Root watches PreviewMode, so turning it
+              // off rebuilds the tree back to the pairing screen on its own.
+              // Pushing a route here left a blank screen instead.
+              onPressed: () => context.read<PreviewMode>().exit(),
+              style: TextButton.styleFrom(
+                foregroundColor: TapDeskColors.primary,
+                minimumSize: const Size(72, TapDeskSpace.minTouchTarget),
+              ),
+              child: const Text('Exit'),
+            ),
+          ],
+        ),
       ),
     );
   }

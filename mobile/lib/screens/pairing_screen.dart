@@ -3,7 +3,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../state/pairing_store.dart';
+import '../state/preview_mode.dart';
 import '../theme/tokens.dart';
+import '../transport/event_sink.dart';
 import '../transport/pairing_payload.dart';
 import '../ui/haptics.dart';
 
@@ -107,6 +109,11 @@ class _PairingScreenState extends State<PairingScreen> {
                   ? null
                   : () => _openManualEntry(context, store),
             ),
+            // Debug builds only. The companion that shows a QR code is Phase 5,
+            // so until then this is the only way to see the controller at all -
+            // and the plan requires visual sign-off on the design before any
+            // transport work. See PreviewMode.
+            if (context.watch<PreviewMode>().allowed) _PreviewEntry(),
             if (_error != null) _ErrorStrip(message: _error!),
           ],
         ),
@@ -615,6 +622,42 @@ class _Field extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Opens the controller with no PC, for reviewing the design on a device.
+///
+/// Deliberately the least prominent thing on the screen, and impossible in
+/// release builds.
+class _PreviewEntry extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          TapDeskSpace.s4, 0, TapDeskSpace.s4, TapDeskSpace.s3),
+      child: SizedBox(
+        width: double.infinity,
+        child: TextButton.icon(
+          onPressed: () {
+            final preview = context.read<PreviewMode>();
+            if (!preview.enter()) return;
+
+            // Preview needs somewhere to put presses. RecordingEventSink keeps
+            // them for inspection and never opens a socket.
+            final sink = context.read<EventSink>();
+            if (sink is RecordingEventSink) {
+              sink.isReady = true;
+            }
+          },
+          icon: const Icon(Icons.visibility_outlined, size: 18),
+          label: const Text('Preview the controller (debug build)'),
+          style: TextButton.styleFrom(
+            foregroundColor: TapDeskColors.textMuted,
+            minimumSize: const Size.fromHeight(TapDeskSpace.minTouchTarget),
+          ),
+        ),
+      ),
     );
   }
 }
