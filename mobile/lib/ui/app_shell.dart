@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/connection_controller.dart';
+import '../screens/keyboard_tab.dart';
 import '../screens/mouse_tab.dart';
 import '../screens/slides_tab.dart';
 import '../state/pairing_store.dart';
@@ -68,11 +69,7 @@ class _AppShellState extends State<AppShell> {
                 // one placeholder, so the shell never changes shape again.
                 const SlidesTab(),
                 const MouseTab(),
-                _TabPlaceholder(
-                  name: 'Keyboard',
-                  enabled: enabled,
-                  status: info.status,
-                ),
+                const KeyboardTab(),
               ],
             ),
           ),
@@ -286,60 +283,6 @@ class _TabButton extends StatelessWidget {
               child: Text(label),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Stands in for a real tab body until Phase 3 builds them.
-///
-/// It is intentionally explicit rather than an empty box: it states which
-/// phase fills it in, and it demonstrates the "never look broken" rule by
-/// disabling itself and saying why.
-class _TabPlaceholder extends StatelessWidget {
-  const _TabPlaceholder({
-    required this.name,
-    required this.enabled,
-    required this.status,
-  });
-
-  final String name;
-  final bool enabled;
-  final ConnectionStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(TapDeskSpace.s5),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.construction_outlined,
-              size: 40,
-              color: TapDeskColors.divider,
-            ),
-            const SizedBox(height: TapDeskSpace.s4),
-            Text('$name tab', style: TapDeskText.button),
-            const SizedBox(height: TapDeskSpace.s2),
-            Text(
-              enabled
-                  ? 'Built in Phase 3.'
-                  : 'Connect to a PC to use this tab.',
-              style: TapDeskText.label,
-              textAlign: TextAlign.center,
-            ),
-            if (!enabled && status == ConnectionStatus.idle)
-              const SizedBox(height: TapDeskSpace.s1),
-            if (!enabled && status == ConnectionStatus.idle)
-              Text(
-                'Scan a QR code from the companion to pair.',
-                style: TapDeskText.label,
-                textAlign: TextAlign.center,
-              ),
-          ],
         ),
       ),
     );

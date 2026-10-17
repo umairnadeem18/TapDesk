@@ -90,14 +90,12 @@ void main() {
 
     expect(find.text('Not connected'), findsOneWidget);
 
-    // Slides is a real screen now, so it shows its controls and relies on the
-    // banner plus inert buttons rather than placeholder text.
+    // All three tabs are built now, so each shows real controls.
     expect(find.text('Next'), findsOneWidget);
 
-    // Keyboard is not built yet, so it still explains itself.
     await tester.tap(find.text('Keyboard'));
     await tester.pumpAndSettle();
-    expect(find.text('Connect to a PC to use this tab.'), findsOneWidget);
+    expect(find.text('Copy'), findsOneWidget);
   });
 
   testWidgets('settings opens from the app bar', (tester) async {
