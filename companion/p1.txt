@@ -1,0 +1,12 @@
+........................................................................ [ 43%]
+........................................................................ [ 86%]
+.......................                                                  [100%]
+============================== warnings summary ===============================
+tests/test_e2e.py::TestBackendActuallyListens::test_the_socket_really_accepts_a_tcp_connection
+  D:\DevTools\python312\Lib\asyncio\base_events.py:716: RuntimeWarning: coroutine 'IocpProactor.accept.<locals>.accept_coro' was never awaited
+    self._ready.clear()
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+167 passed, 1 warning in 10.93s

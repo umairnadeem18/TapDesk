@@ -1,0 +1,24 @@
+00:00 +0: loading D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: the QR payload has the shape the phone expects
+00:01 +1: a real pinned socket completes the handshake
+00:02 +1 -1: a real pinned socket completes the handshake [E]
+  Bad state: Stream has already been listened to.
+  dart:async                                  Stream.first
+  test\cross_implementation_test.dart 182:55  main.<fn>
+  
+00:02 +1 -1: a fingerprint that does not match is refused
+Shell: tapdesk: rejected a certificate that did not match the paired computer
+00:03 +2 -1: every frame the phone sends passes the companion validation
+00:04 +2 -2: every frame the phone sends passes the companion validation [E]
+  Bad state: Stream has already been listened to.
+  dart:async                                  Stream.first
+  test\cross_implementation_test.dart 231:27  main.<fn>
+  
+00:04 +2 -2: an unknown field does not break the handshake
+00:05 +3 -2: (tearDownAll)
+00:05 +3 -2: Some tests failed.
+
+Failing tests:
+  D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: a real pinned socket completes the handshake
+  D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: every frame the phone sends passes the companion validation

@@ -281,8 +281,38 @@ class Companion:
         await self._server.start(port=self._pairing.port)
         self._tick_task = asyncio.create_task(self._run_ticks())
         self._started.set()
+        self._publish_link()
         log.info("listening on port %s", self._pairing.port)
         await self._exit.wait()
+
+    def _publish_link(self) -> None:
+        """Write the live pairing link to the config directory.
+
+        Without this, anything asking a *running* companion for its code had to
+        mint a new session to do it, and got back a token the server had never
+        heard of. That made the code useless to a script, and to anything
+        automating setup - the token simply never matched.
+        """
+        session = self._pairing.current()
+        path = self.config_dir / "pairing.link"
+        try:
+            path.write_text(
+                f"{session.deep_link()}\n"
+                f"fingerprint {session.fingerprint}\n"
+                f"port {session.port}\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:  # pragma: no cover - best effort
+            log.warning("could not publish the pairing link: %s", exc)
+
+    @staticmethod
+    def _read_published_link(config_dir: Path) -> str | None:
+        """The link a running companion published, if there is a fresh one."""
+        path = config_dir / "pairing.link"
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError:
+            return None
 
     def start_backend(self, timeout: float = 10.0) -> None:
         """Start the server on a background loop and wait until it listens.
@@ -547,12 +577,26 @@ def main(argv: list[str] | None = None) -> int:
         config_dir=args.config_dir, port=args.port, headless=args.headless
     )
 
+    # Checked before anything is constructed. Minting a fresh session here would
+    # print a token the running server has never heard of, which is worse than
+    # useless: it looks right and never pairs.
     if args.print_link:
+        published = Companion._read_published_link(args.config_dir)
+        if published is not None:
+            print(published.strip())
+            return 0
+
+        companion = Companion(
+            config_dir=args.config_dir, port=args.port, headless=True
+        )
         session = companion._pairing.current()
         print(session.deep_link())
         print(f"fingerprint {session.fingerprint}")
         return 0
 
+    companion = Companion(
+        config_dir=args.config_dir, port=args.port, headless=args.headless
+    )
     return companion.run()
 
 

@@ -1,0 +1,30 @@
+00:00 +0: loading D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: the QR payload has the shape the phone expects
+00:01 +1: a real pinned socket completes the handshake
+00:02 +1 -1: a real pinned socket completes the handshake [E]
+  type '_ControllerSubscription<Object?>' is not a subtype of type 'StreamSubscription<String>?'
+  package:tapdesk_mobile/transport/socket.dart 67:5    new PinnedSocket._
+  package:tapdesk_mobile/transport/socket.dart 108:25  PinnedSocket.open
+  
+00:02 +1 -1: a fingerprint that does not match is refused
+Shell: tapdesk: rejected a certificate that did not match the paired computer
+00:03 +2 -1: every frame the phone sends passes the companion validation
+00:04 +2 -2: every frame the phone sends passes the companion validation [E]
+  type '_ControllerSubscription<Object?>' is not a subtype of type 'StreamSubscription<String>?'
+  package:tapdesk_mobile/transport/socket.dart 67:5    new PinnedSocket._
+  package:tapdesk_mobile/transport/socket.dart 108:25  PinnedSocket.open
+  
+00:04 +2 -2: an unknown field does not break the handshake
+00:05 +2 -3: an unknown field does not break the handshake [E]
+  type '_ControllerSubscription<Object?>' is not a subtype of type 'StreamSubscription<String>?'
+  package:tapdesk_mobile/transport/socket.dart 67:5    new PinnedSocket._
+  package:tapdesk_mobile/transport/socket.dart 108:25  PinnedSocket.open
+  
+00:05 +2 -3: (tearDownAll)
+00:05 +2 -3: Some tests failed.
+
+Failing tests:
+  D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: a real pinned socket completes the handshake
+  D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: an unknown field does not break the handshake
+  D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: every frame the phone sends passes the companion validation

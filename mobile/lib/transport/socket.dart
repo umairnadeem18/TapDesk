@@ -9,6 +9,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:web_socket_channel/io.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'fingerprint.dart';
 
@@ -64,9 +65,15 @@ class PinnedSocket implements TapDeskSocket {
   PinnedSocket._(this._channel) {
     // The controller is exposed as the message stream so a socket that hangs
     // up turns into a stream close, which is what the session watches for.
-    _subscription = _channel.stream.listen(
-      (Object? line) => _incoming.add(line.toString()),
-      onDone: () => _incoming.close(),
+    // `map` to String is what keeps the subscription typed: the raw stream is
+    // Stream<dynamic>, and declaring the field as StreamSubscription<String>
+    // while listening to the dynamic one only failed at runtime, against a
+    // real socket.
+    _subscription = _channel.stream.map((Object? line) => line.toString()).listen(
+      _incoming.add,
+      onDone: () {
+        if (!_incoming.isClosed) _incoming.close();
+      },
       onError: _incoming.addError,
     );
   }
@@ -138,7 +145,10 @@ class PinnedSocket implements TapDeskSocket {
     return client;
   }
 
-  final dynamic _channel;
+  /// The channel, typed rather than dynamic: declaring it loosely is what let a
+/// Stream<dynamic> be assigned to a StreamSubscription<String> without the
+/// analyzer noticing.
+final WebSocketChannel _channel;
   final StreamController<String> _incoming = StreamController<String>();
   StreamSubscription<String>? _subscription;
 

@@ -1,0 +1,6 @@
+lib/transport/socket.dart:150:7: Error: Type 'WebSocketChannel' not found.
+final WebSocketChannel _channel;
+      ^^^^^^^^^^^^^^^^
+lib/transport/socket.dart:150:7: Error: 'WebSocketChannel' isn't a type.
+final WebSocketChannel _channel;
+      ^^^^^^^^^^^^^^^^

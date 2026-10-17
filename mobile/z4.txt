@@ -1,0 +1,23 @@
+00:00 +0: loading D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: the QR payload has the shape the phone expects
+00:01 +1: a real pinned socket completes the handshake
+00:02 +2: a fingerprint that does not match is refused
+Shell: tapdesk: rejected a certificate that did not match the paired computer
+00:03 +3: a phone that scans a code gets nothing without approval
+00:04 +4: every frame the phone sends passes the companion validation
+00:12 +4 -1: every frame the phone sends passes the companion validation [E]
+  Expected: ('error' or 'auth_err')
+    Actual: <null>
+  the companion must reject a button it has never heard of
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test\cross_implementation_test.dart 429:5           main.<fn>
+  
+00:12 +4 -1: an unknown field does not break the handshake
+00:13 +5 -1: (tearDownAll)
+00:13 +5 -1: Some tests failed.
+
+Failing tests:
+  D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: every frame the phone sends passes the companion validation

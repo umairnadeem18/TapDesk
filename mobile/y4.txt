@@ -1,0 +1,14 @@
+00:00 +0: loading D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart
+00:00 +0 -1: loading D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart [E]
+  Failed to load "D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart":
+  Compilation failed for testPath=D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: lib/transport/socket.dart:150:7: Error: Type 'WebSocketChannel' not found.
+  final WebSocketChannel _channel;
+        ^^^^^^^^^^^^^^^^
+  lib/transport/socket.dart:150:7: Error: 'WebSocketChannel' isn't a type.
+  final WebSocketChannel _channel;
+        ^^^^^^^^^^^^^^^^
+  .
+00:00 +0 -1: Some tests failed.
+
+Failing tests:
+  D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart: loading D:/Development/TAPDESK/mobile/test/cross_implementation_test.dart
