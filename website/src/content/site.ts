@@ -19,27 +19,27 @@
 export const RELEASES = {
   android: {
     version: "v1.0.0-beta.1",
-    size: "23.9 MB",
+    size: "24.1 MB",
     minAndroid: "Android 8.0 (API 26)",
     // SHA-256 of TapDesk-v1.0.0-beta.1-arm64-v8a.apk
     sha256:
-      "08a813e6ba8ae4b38c75b08aa8a97e1769a6c6c107d271abd4c245e8c61bac92",
+      "9f10594f15a826b471763c7cd20cc952a535cbb3aee127b517927ca5ba5cc78b",
     url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.1/TapDesk-v1.0.0-beta.1-arm64-v8a.apk",
     variants: [
       {
         id: "arm64-v8a",
         label: "Most phones (2017 and newer)",
-        size: "23.9 MB",
+        size: "24.1 MB",
         sha256:
-          "08a813e6ba8ae4b38c75b08aa8a97e1769a6c6c107d271abd4c245e8c61bac92",
+          "9f10594f15a826b471763c7cd20cc952a535cbb3aee127b517927ca5ba5cc78b",
         url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.1/TapDesk-v1.0.0-beta.1-arm64-v8a.apk",
       },
       {
         id: "armeabi-v7a",
         label: "Older or budget phones",
-        size: "19.9 MB",
+        size: "20.0 MB",
         sha256:
-          "d2bfbbf3718b49f816a06a55d1e5846727189b8b0ddcfcbb972ce371c2f22ce9",
+          "807af19241bfee0a1e4d7c3d17f02f7499773fd1cf7e6d79c2b1d4c24c5910e9",
         url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.1/TapDesk-v1.0.0-beta.1-armeabi-v7a.apk",
       },
     ],
