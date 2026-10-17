@@ -86,12 +86,14 @@ class PairingServer:
         pairing: PairingManager,
         on_event: Callable[[ConnectionState, dict[str, Any]], None] | None = None,
         on_approval_request: Callable[[str, str], Awaitable[bool]] | None = None,
+        on_release: Callable[[], None] | None = None,
     ) -> None:
         self._ssl = cert
         self._devices = devices
         self._pairing = pairing
         self._on_event = on_event or (lambda state, message: None)
         self._on_approval = on_approval_request
+        self._on_release = on_release
         self._states: dict[ServerConnection, ConnectionState] = {}
         self._server: Any = None
 
@@ -340,12 +342,21 @@ class PairingServer:
 
         Section 7.10. A phone that dies mid-drag would otherwise leave a mouse
         button or a key held down on the user's desktop until they noticed.
+
+        Both halves are needed and neither is enough alone: clearing the
+        per-connection stick stops the cursor gliding, and `on_release` tells
+        the input layer to physically let go of what it pressed. The second
+        half used to be missing, which left Ctrl and the mouse button latched
+        down with nothing on screen to explain it.
         """
         if state.pending_move != (0, 0):
             state.pending_move = (0, 0)
         if state.stick != (0.0, 0.0):
             state.stick = (0.0, 0.0)
             state.stick_updated = time.monotonic()
+
+        if self._on_release is not None:
+            self._on_release()
 
     # -- helpers -----------------------------------------------------------
 

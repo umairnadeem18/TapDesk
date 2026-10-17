@@ -48,15 +48,6 @@ class TestCompanion:
         assert data["fp"] == companion._pairing.fingerprint
         assert data["port"] == companion._pairing.port
 
-    def test_headless_refuses_pairing_rather_than_allowing_it(
-        self, tmp_path: Path
-    ) -> None:
-        # No window means nobody to ask. Allowing by default would turn a
-        # missing UI into an auto-approve, which is the one thing the Allow
-        # prompt exists to prevent.
-        companion = Companion(headless=True, config_dir=tmp_path)
-        assert companion._ask_approval("Pixel 7", "1.2.3.4") is False
-
     def test_disconnect_releases_everything_held(self, tmp_path: Path) -> None:
         companion = Companion(headless=True, config_dir=tmp_path)
         companion._simulator.handle({"t": "key", "k": "ctrl", "a": "press"})

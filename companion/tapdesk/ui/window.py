@@ -65,11 +65,17 @@ def dot_icon(colour: QColor, size: int = 16) -> QIcon:
 
 @dataclass
 class UiCallbacks:
-    """What the window needs the application to do for it."""
+    """What the window needs the application to do for it.
+
+    A dataclass rather than a pile of optional callbacks so that adding one
+    fails loudly at construction instead of being discovered as a silent
+    no-op on the button that needed it.
+    """
 
     on_disconnect: Callable[[], None]
     on_revoke: Callable[[str], None]
     on_quit: Callable[[], None]
+    on_safe_mode: Callable[[bool], None] | None = None
 
 
 class MainWindow(QWidget):
@@ -215,14 +221,45 @@ class MainWindow(QWidget):
         holder = QWidget()
         layout = QHBoxLayout(holder)
         layout.setContentsMargins(0, 6, 0, 0)
+        layout.setSpacing(8)
 
         self._disconnect = QPushButton("Disconnect")
         self._disconnect.setObjectName("primary")
         self._disconnect.setEnabled(False)
         self._disconnect.clicked.connect(self._callbacks.on_disconnect)
 
+        self._safe_mode = QPushButton("Safe Mode")
+        self._safe_mode.setObjectName("quiet")
+        self._safe_mode.setCheckable(True)
+        self._safe_mode.setToolTip(
+            "Stop the phone from controlling anything, without disconnecting.\n"
+            "Your own keyboard and mouse keep working."
+        )
+        self._safe_mode.toggled.connect(self._on_safe_mode)
+
         layout.addWidget(self._disconnect)
+        layout.addWidget(self._safe_mode)
+
+        # The escape hatch has to be discoverable or it does not exist. It is
+        # in the tray as well, but a user who has lost the window has no tray
+        # yet, and this is the one control that must always be reachable.
+        self._hotkey_hint = QLabel("")
+        self._hotkey_hint.setObjectName("fingerprint")
+        layout.addWidget(self._hotkey_hint)
         return holder
+
+    def set_hotkey_hint(self, hotkey: str) -> None:
+        self._hotkey_hint.setText(f"press {hotkey} anywhere to release control")
+
+    def _on_safe_mode(self, enabled: bool) -> None:
+        if self._callbacks.on_safe_mode is not None:
+            self._callbacks.on_safe_mode(enabled)
+        self.set_status(
+            "Safe Mode - phone input ignored" if enabled else "",
+            WARNING if enabled else TEXT_MUTED,
+        )
+        if not enabled:
+            self._status_text.setText("")
 
     # -- updates -----------------------------------------------------------
 
@@ -306,23 +343,36 @@ class MainWindow(QWidget):
 
 
 class Tray(QSystemTrayIcon):
-    """The system tray presence, so the companion is never invisible."""
+    """The system tray presence, so the companion is never invisible.
+
+    The window hides itself when closed rather than quitting, which means the
+    tray is the only way back to it. If "Show QR code" does nothing, closing
+    the window loses the pairing code entirely, so the app assigns
+    `show_requested` a callable at startup.
+    """
 
     def __init__(self, callbacks: UiCallbacks) -> None:
         super().__init__(dot_icon(TEXT_MUTED))
         self._callbacks = callbacks
+        #: Assigned by the application once the window exists.
+        self.show_requested: Callable[[], None] | None = None
         self.setToolTip("TapDesk")
 
-        menu = self.contextMenu()
-        if menu is None:
-            from PySide6.QtWidgets import QMenu
+        from PySide6.QtWidgets import QMenu
 
-            menu = QMenu()
+        menu = QMenu()
 
         show = QAction("Show QR code", menu)
-        show.triggered.connect(callbacks.on_disconnect if False else self._noop)
-        show.triggered.connect(self._show_requested)
+        show.triggered.connect(self._show)
         menu.addAction(show)
+
+        self._safe_action = QAction("Safe Mode", menu)
+        self._safe_action.setCheckable(True)
+        self._safe_action.setToolTip(
+            "Ignore the phone without disconnecting it"
+        )
+        self._safe_action.triggered.connect(self._safe_toggled)
+        menu.addAction(self._safe_action)
 
         disconnect = QAction("Disconnect all", menu)
         disconnect.triggered.connect(callbacks.on_disconnect)
@@ -334,13 +384,14 @@ class Tray(QSystemTrayIcon):
         menu.addAction(quit_action)
 
         self.setContextMenu(menu)
-        self._show_requested = lambda: None
 
-    def _show_requested(self) -> None:  # pragma: no cover - overridden by app
-        pass
+    def _show(self) -> None:
+        if self.show_requested is not None:
+            self.show_requested()
 
-    def _noop(self) -> None:
-        pass
+    def _safe_toggled(self, enabled: bool) -> None:
+        if self._callbacks.on_safe_mode is not None:
+            self._callbacks.on_safe_mode(enabled)
 
     def set_connected(self, connected: bool) -> None:
         self.setIcon(dot_icon(PRIMARY if connected else TEXT_MUTED))
