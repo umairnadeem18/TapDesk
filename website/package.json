@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/ensure-lightningcss.js",
+    "prebuild": "node scripts/ensure-native-bindings.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
