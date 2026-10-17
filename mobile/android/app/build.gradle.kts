@@ -1,10 +1,41 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Release signing.
+//
+// The keystore and its passwords live OUTSIDE the repository, in
+// D:\Development\TapDesk-Secrets\, and only this properties file - which is
+// gitignored - points at them. Losing that keystore means we can never publish
+// an update to an app that is already installed, so it is backed up separately
+// (plan task 7.2).
+//
+// key.properties is optional: without it a release build falls back to debug
+// signing, which is useful for a throwaway local build and useless for
+// anything a user installs.
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
 android {
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
     namespace = "app.tapdesk.tapdesk_mobile"
     compileSdk = flutter.compileSdkVersion
 
@@ -33,9 +64,21 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Signed with our own keystore when one is configured, so an
+            // installed app can be updated later. Never with the debug key:
+            // Google Play rejects debug-signed uploads, and a debug key that
+            // changes per machine breaks updates.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

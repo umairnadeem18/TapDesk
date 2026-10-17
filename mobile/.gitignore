@@ -46,3 +46,10 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Release signing - NEVER commit. The keystore lives in D:\Development\TapDesk-Secrets\
+# and key.properties only points at it. Losing the keystore means we can never
+# update an already-installed app, so it is backed up separately (plan task 7.2).
+android/key.properties
+*.jks
+*.keystore
