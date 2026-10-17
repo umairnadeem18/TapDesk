@@ -43,8 +43,11 @@ void main() {
       expect(m.isLatched('ctrl'), isTrue);
 
       expect(m.consume(), ['ctrl']);
-      expect(m.isEmpty, isTrue,
-          reason: 'a latched modifier must not survive its use');
+      expect(
+        m.isEmpty,
+        isTrue,
+        reason: 'a latched modifier must not survive its use',
+      );
     });
 
     test('toggling twice releases', () {
@@ -80,8 +83,11 @@ void main() {
         '`': 'grave',
       };
       for (final entry in pairs.entries) {
-        expect(KeyboardLayout.characterToKeyId(entry.key), entry.value,
-            reason: '${entry.key} maps wrong');
+        expect(
+          KeyboardLayout.characterToKeyId(entry.key),
+          entry.value,
+          reason: '${entry.key} maps wrong',
+        );
       }
     });
 
@@ -96,45 +102,53 @@ void main() {
       // protocol id: the companion drops it with E_BAD_FIELD and the user
       // sees a dead key. So each key is checked against one of the three
       // categories it is actually allowed to be.
-      const localOnly = {'caps', 'fn'};
-      final all = [
-        ...KeyboardLayout.numberRow,
-        ...KeyboardLayout.topRow,
-        ...KeyboardLayout.homeRow,
-        ...KeyboardLayout.bottomRow,
-        ...KeyboardLayout.spaceRow,
-      ];
+      final all = <String>{
+        ...KeyboardLayout.lettersTop,
+        ...KeyboardLayout.lettersHome,
+        ...KeyboardLayout.lettersBottom,
+        ...KeyboardLayout.lettersSpace,
+        ...KeyboardLayout.symbolsTop,
+        ...KeyboardLayout.symbolsHome,
+        ...KeyboardLayout.symbolsBottom,
+      };
 
       for (final key in all) {
-        if (localOnly.contains(key)) continue;
+        if (KeyboardLayout.localOnly.contains(key)) continue;
         if (KeyboardLayout.modifiers.contains(key)) {
           expect(ProtocolKeyShim.all, contains(key));
           continue;
         }
         if (KeyboardLayout.labels.containsKey(key)) {
           // A named key: its id must itself be a protocol key id.
-          expect(ProtocolKeyShim.all, contains(key),
-              reason: '$key is rendered as a key but is not a protocol id');
+          expect(
+            ProtocolKeyShim.all,
+            contains(key),
+            reason: '$key is rendered as a key but is not a protocol id',
+          );
           continue;
         }
-        expect(KeyboardLayout.characterToKeyId(key), isNotNull,
-            reason: '$key is a character with no mapping');
+        expect(
+          KeyboardLayout.characterToKeyId(key),
+          isNotNull,
+          reason: '$key is a character with no mapping',
+        );
       }
     });
 
-    test('caps and fn are the only non-protocol keys', () {
-      // If a key is rendered but has no protocol id and is not in localOnly,
-      // it is a dead key waiting to be found in a lecture hall.
-      const localOnly = {'caps', 'fn'};
+    test('every rendered key is either a protocol id or local-only', () {
+      // If a key is rendered but has no protocol id and is not local-only, it
+      // is a dead key waiting to be found in a lecture hall.
       final all = {
-        ...KeyboardLayout.numberRow,
-        ...KeyboardLayout.topRow,
-        ...KeyboardLayout.homeRow,
-        ...KeyboardLayout.bottomRow,
-        ...KeyboardLayout.spaceRow,
+        ...KeyboardLayout.lettersTop,
+        ...KeyboardLayout.lettersHome,
+        ...KeyboardLayout.lettersBottom,
+        ...KeyboardLayout.lettersSpace,
+        ...KeyboardLayout.symbolsTop,
+        ...KeyboardLayout.symbolsHome,
+        ...KeyboardLayout.symbolsBottom,
       };
       for (final key in all) {
-        if (localOnly.contains(key)) continue;
+        if (KeyboardLayout.localOnly.contains(key)) continue;
         if (ProtocolKeyShim.all.contains(key)) continue;
         final mapped = KeyboardLayout.characterToKeyId(key);
         expect(mapped, isNotNull, reason: '$key is dead on the wire');
@@ -156,15 +170,15 @@ void main() {
   });
 
   group('typing', () {
-    testWidgets('a letter is sent as text, not as a key event',
-        (tester) async {
+    testWidgets('a letter is sent as text, not as a key event', (tester) async {
       final sink = await openKeyboard(tester);
 
       await tester.tap(find.text('A'));
       await tester.pumpAndSettle();
 
-      expect(sink.frames, ['{"t":"text","s":"a"}'],
-          reason: 'printable keys must use text so Unicode works');
+      expect(sink.frames, [
+        '{"t":"text","s":"a"}',
+      ], reason: 'printable keys must use text so Unicode works');
     });
 
     testWidgets('shift upper-cases exactly one character', (tester) async {
@@ -194,8 +208,9 @@ void main() {
       expect(sink.frames, ['{"t":"combo","keys":["ctrl","c"]}']);
     });
 
-    testWidgets('the latch is consumed, so the next key is plain',
-        (tester) async {
+    testWidgets('the latch is consumed, so the next key is plain', (
+      tester,
+    ) async {
       final sink = await openKeyboard(tester);
 
       await tester.tap(find.widgetWithText(KeyCap, 'Ctrl'));
@@ -214,9 +229,13 @@ void main() {
     testWidgets('Enter and Backspace use protocol key ids', (tester) async {
       final sink = await openKeyboard(tester);
 
-      await tester.tap(find.widgetWithText(KeyCap, KeyboardLayout.labels['enter']!));
+      await tester.tap(
+        find.widgetWithText(KeyCap, KeyboardLayout.labels['enter']!),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(KeyCap, KeyboardLayout.labels['backspace']!));
+      await tester.tap(
+        find.widgetWithText(KeyCap, KeyboardLayout.labels['backspace']!),
+      );
       await tester.pumpAndSettle();
 
       expect(sink.frames, [
@@ -225,8 +244,7 @@ void main() {
       ]);
     });
 
-    testWidgets('the Copy shortcut sends the documented chord',
-        (tester) async {
+    testWidgets('the Copy shortcut sends the documented chord', (tester) async {
       final sink = await openKeyboard(tester);
 
       await tester.tap(find.text('Copy'));
@@ -235,18 +253,52 @@ void main() {
       expect(sink.frames, ['{"t":"combo","keys":["ctrl","c"]}']);
     });
 
-    testWidgets('caps and fn are never sent as key events',
+    testWidgets('caps, 123 and fn are never sent as key events',
         (tester) async {
       final sink = await openKeyboard(tester);
 
-      await tester.tap(find.widgetWithText(KeyCap, 'Caps').first);
+      // Caps Lock moved to the symbols layer when the letter rows had to shed
+      // a key, so the layer is switched first.
+      await tester.tap(find.widgetWithText(KeyCap, '123').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(KeyCap, 'CAPS').first);
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(KeyCap, 'Fn'));
       await tester.pumpAndSettle();
 
-      // Neither "caps" nor "fn" is a protocol key id, so sending them would be
-      // silently dropped by the companion and the key would look broken.
+      // None of these is a protocol key id, so sending them would be silently
+      // dropped by the companion and the key would look broken.
       expect(sink.frames, isEmpty);
+    });
+  });
+
+  group('layout density', () {
+    test('no row holds more than eleven keys', () {
+      // Found on a device: fourteen keys across a 360 dp phone left ~26 dp per
+      // key against a 56 dp requirement, and the keyboard looked cramped.
+      // Digits and punctuation moved behind the 123 toggle to make room.
+      final rows = <List<String>>[
+        KeyboardLayout.lettersTop,
+        KeyboardLayout.lettersHome,
+        KeyboardLayout.lettersBottom,
+        KeyboardLayout.lettersSpace,
+        KeyboardLayout.symbolsTop,
+        KeyboardLayout.symbolsHome,
+        KeyboardLayout.symbolsBottom,
+      ];
+      for (final row in rows) {
+        expect(
+          row.length,
+          lessThanOrEqualTo(11),
+          reason: 'a row holds ${row.length} keys',
+        );
+      }
+    });
+
+    test('digits and punctuation live behind the 123 toggle', () {
+      expect(KeyboardLayout.lettersTop.contains('1'), isFalse);
+      expect(KeyboardLayout.lettersSpace, contains('123'));
+      expect(KeyboardLayout.symbolsBottom, contains('abc'));
     });
   });
 }
@@ -259,14 +311,50 @@ class ProtocolKeyShim {
   static final Set<String> all = {
     ...'abcdefghijklmnopqrstuvwxyz'.split(''),
     ...'0123456789'.split(''),
-    'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12',
-    'up','down','left','right',
-    'enter','tab','backspace','delete','insert','esc','space',
+    'f1',
+    'f2',
+    'f3',
+    'f4',
+    'f5',
+    'f6',
+    'f7',
+    'f8',
+    'f9',
+    'f10',
+    'f11',
+    'f12',
+    'up',
+    'down',
+    'left',
+    'right',
+    'enter',
+    'tab',
+    'backspace',
+    'delete',
+    'insert',
+    'esc',
+    'space',
     ...modifiers,
-    'capslock','numlock','scrolllock',
-    'home','end','pgup','pgdn',
-    'minus','equal','lbracket','rbracket','backslash','semicolon','apostrophe',
-    'grave','comma','period','slash',
-    'printscreen','pause','menu',
+    'capslock',
+    'numlock',
+    'scrolllock',
+    'home',
+    'end',
+    'pgup',
+    'pgdn',
+    'minus',
+    'equal',
+    'lbracket',
+    'rbracket',
+    'backslash',
+    'semicolon',
+    'apostrophe',
+    'grave',
+    'comma',
+    'period',
+    'slash',
+    'printscreen',
+    'pause',
+    'menu',
   };
 }

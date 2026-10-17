@@ -9,40 +9,60 @@ import '../transport/tapdesk_event.dart';
 /// `key`: one Unicode code point per character means Urdu, emoji and accents
 /// all work without a character table on the PC side, which is the whole
 /// reason the protocol has a text message at all.
+///
+/// ## Why no row holds more than eleven keys
+///
+/// A phone is about 360 dp wide. Fourteen keys across leaves roughly 26 dp
+/// each - about half the 56 dp the design system requires - and that is why
+/// the first version looked cramped and fiddly on a real device. Eleven keys
+/// gives about 33 dp, which is the density every phone keyboard has used since
+/// the original iPhone. Digits and punctuation moved behind a `123` toggle for
+/// exactly this reason: they cannot share a row with the letters.
 class KeyboardLayout {
   const KeyboardLayout._();
 
-  /// Number row.
-  ///
-  /// Every entry is a key ID, never a glyph. An earlier version ended this row
-  /// with the '⌫' glyph, which is not a protocol key id and not a printable
-  /// character either, so Backspace silently typed a backspace symbol instead
-  /// of deleting.
-  static const List<String> numberRow = [
-    '`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'backspace',
+  // ---- letters layer ---------------------------------------------------
+
+  /// Ten letters plus Backspace, which is where a phone keyboard puts it
+  /// rather than up on a digit row.
+  static const List<String> lettersTop = [
+    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 'backspace',
   ];
 
-  /// QWERTY. Space is handled separately - it spans the width.
-  static const List<String> topRow = [
-    'tab', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\\',
+  static const List<String> lettersHome = [
+    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', 'enter',
   ];
 
-  static const List<String> homeRow = [
-    'caps', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'", 'enter',
+  static const List<String> lettersBottom = [
+    'shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/',
   ];
 
-  static const List<String> bottomRow = [
-    'shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 'shift',
+  /// `123` leads the bottom row so it falls under the thumb rather than at
+  /// the far edge.
+  static const List<String> lettersSpace = ['123', 'ctrl', 'win', 'space', 'fn'];
+
+  // ---- symbols layer ---------------------------------------------------
+
+  static const List<String> symbolsTop = [
+    '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
   ];
 
-  static const List<String> spaceRow = ['ctrl', 'alt', 'win', 'space', 'fn'];
+  static const List<String> symbolsHome = [
+    '-', '=', '[', ']', '\\', ';', "'", ',', '.', '/', 'backspace',
+  ];
+
+  /// Caps Lock lives here rather than on the letters layer, which has no room
+  /// left - it used to steal a slot from the home row.
+  static const List<String> symbolsBottom = ['abc', 'caps', 'shift', 'space'];
+
+  /// Layers switch with `123` and `abc`.
+  static const String lettersToggleKey = '123';
+  static const String symbolsToggleKey = 'abc';
 
   /// What each non-character key is called on screen. Keys not in this map are
   /// rendered as themselves, which covers every printable character.
   static const Map<String, String> labels = {
     'backspace': '⌫',
-    'tab': 'Tab',
-    'caps': 'Caps',
     'enter': '↵',
     'shift': 'Shift',
     'ctrl': 'Ctrl',
@@ -50,9 +70,23 @@ class KeyboardLayout {
     'win': 'Win',
     'space': ' ',
     'fn': 'Fn',
+    '123': '123',
+    'abc': 'ABC',
   };
 
-  /// Keys that are modifiers rather than characters.
+  /// Keys that act on this app's own layout and are never sent to the PC.
+  ///
+  /// These are not protocol key ids. Sending them produced
+  /// `{"t":"key","k":"caps"}`, which the companion drops with E_BAD_FIELD -
+  /// a key that looks entirely normal and does nothing.
+  static const Set<String> localOnly = {
+    '123',
+    'abc',
+    'fn',
+    'caps',
+  };
+
+  /// Modifiers, for sticky-key handling and the Safe Mode allow list.
   static const Set<String> modifiers = {
     ProtocolKey.shift,
     ProtocolKey.ctrl,
