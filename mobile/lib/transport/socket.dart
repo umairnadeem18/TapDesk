@@ -12,6 +12,23 @@ import 'package:web_socket_channel/io.dart';
 
 import 'fingerprint.dart';
 
+/// Why a connection could not be established.
+///
+/// Split out rather than left as a generic exception because the user action
+/// differs completely. A [HandshakeFailure.fingerprintMismatch] means stop and
+/// go and look at the right screen; a timeout means try again.
+enum HandshakeFailure { fingerprintMismatch, timedOut }
+
+/// A connection that failed in a way the user needs to hear about specifically.
+class HandshakeException implements Exception {
+  const HandshakeException(this.reason);
+
+  final HandshakeFailure reason;
+
+  @override
+  String toString() => 'HandshakeException($reason)';
+}
+
 /// A bidirectional text channel to the companion.
 abstract class TapDeskSocket {
   /// Lines arriving from the PC. Single-subscription: the session owns it.
@@ -60,7 +77,13 @@ class PinnedSocket implements TapDeskSocket {
     required String fingerprint,
     Duration timeout = const Duration(seconds: 8),
   }) async {
-    final HttpClient client = _pinningClient(fingerprint);
+    // Whether the certificate was rejected is recorded rather than inferred
+    // from the connection error, because "the certificate did not match" and
+    // "the PC is asleep" both surface as a failed handshake and only one of
+    // them is worth the user going to look at the screen.
+    var rejected = false;
+
+    final HttpClient client = _pinningClient(fingerprint, () => rejected = true);
 
     // self-signed: the CA check is meaningless here and is replaced by the
     // fingerprint comparison inside badCertificateCallback.
@@ -70,10 +93,17 @@ class PinnedSocket implements TapDeskSocket {
       connectTimeout: timeout,
     );
 
-    // Without this the handshake does not start until the socket is open, and
-    // a PC that accepts the TCP connection and then stalls would hang here
-    // instead of timing out.
-    await channel.ready;
+    try {
+      // Without this the handshake does not start until the socket is open,
+      // and a PC that accepts the TCP connection and then stalls would hang
+      // here instead of timing out.
+      await channel.ready;
+    } on Object {
+      client.close(force: true);
+      throw HandshakeException(
+        rejected ? HandshakeFailure.fingerprintMismatch : HandshakeFailure.timedOut,
+      );
+    }
 
     return PinnedSocket._(channel);
   }
@@ -85,7 +115,7 @@ class PinnedSocket implements TapDeskSocket {
   /// place the decision is made. Anything not matching the fingerprint is
   /// rejected, which is what stops a second machine on the same Wi-Fi from
   /// answering as the PC.
-  static HttpClient _pinningClient(String fingerprint) {
+  static HttpClient _pinningClient(String fingerprint, void Function() onRejected) {
     final normalised = normaliseFingerprint(fingerprint);
     if (normalised == null) {
       // Fail before opening anything. A malformed fingerprint means the QR
@@ -96,14 +126,12 @@ class PinnedSocket implements TapDeskSocket {
 
     final client = HttpClient();
     client.badCertificateCallback = (X509Certificate certificate, String host, int port) {
-      final actual = sha256Hex(certificate.der);
-      final ok = actual == normalised;
+      final ok = sha256Hex(certificate.der) == normalised;
       if (!ok) {
-        // Deliberately not logging the expected value.
-        stderr.writeln(
-          'tapdesk: rejected a certificate for $host:$port that did not match '
-          'the paired computer',
-        );
+        onRejected();
+        // Deliberately not logging the expected value, the presented
+        // fingerprint, or the host beyond what the user can already see.
+        stderr.writeln('tapdesk: rejected a certificate that did not match the paired computer');
       }
       return ok;
     };
@@ -138,6 +166,19 @@ class PinnedSocket implements TapDeskSocket {
     if (!_incoming.isClosed) await _incoming.close();
     await _channel.sink.close(code, reason);
   }
+}
+
+/// Opens real, pinned sockets. The production [SocketFactory].
+class PinnedSocketFactory implements SocketFactory {
+  const PinnedSocketFactory();
+
+  @override
+  Future<TapDeskSocket> connect({
+    required String host,
+    required int port,
+    required String fingerprint,
+  }) =>
+      PinnedSocket.open(host: host, port: port, fingerprint: fingerprint);
 }
 
 /// A socket that records what it was asked to send.

@@ -166,6 +166,17 @@ class HandshakeMachine {
       case 'error':
         return _reject(message);
 
+      case 'revoked':
+        // Handled here as well as on the connected path: the companion can
+        // revoke a device while it is still pairing, and ignoring that would
+        // leave the app retrying with a key that can never work again.
+        _status = ConnectionStatus.revoked;
+        return const AdvanceTo(ConnectionStatus.revoked);
+
+      case 'denied':
+        _status = ConnectionStatus.denied;
+        return const AdvanceTo(ConnectionStatus.denied);
+
       default:
         return const Ignore();
     }

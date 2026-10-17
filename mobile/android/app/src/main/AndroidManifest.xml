@@ -39,6 +39,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Opens the pairing code if it arrives as a tapdesk:// link -
+                 shared from the PC, or opened from a message. The camera is
+                 still the primary route; this is for the cases where there is
+                 no camera to point at the screen.
+
+                 autoVerify is deliberately absent: there is no website
+                 serving these links, so there is nothing to verify a domain
+                 against. Anyone can send a tapdesk:// link, which is exactly
+                 why the companion still has to be approved by its own user
+                 before it accepts anything. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="tapdesk" android:host="pair"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

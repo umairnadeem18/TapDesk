@@ -67,7 +67,7 @@ class TapDeskSession implements EventSink {
   /// Throws if the certificate does not match. That is not swallowed on
   /// purpose: a failed pin means this is not the computer the user paired
   /// with, and the UI has to say so rather than reconnecting in a loop.
-  Future<void> connect({String? token}) async {
+  Future<void> connect({String? token, String? deviceKey}) async {
     _publish(ConnectionStatus.connecting);
 
     final socket = await factory.connect(
@@ -83,10 +83,12 @@ class TapDeskSession implements EventSink {
       onError: (Object error) => _onSocketClosed(),
     );
 
+    // The caller's key wins, so a freshly reconnected PC is preferred over a
+    // stale one that may since have been revoked.
     final frames = _machine.startFrames(
       deviceName: deviceName,
       token: token,
-      deviceKey: delegate.deviceKey(),
+      deviceKey: deviceKey ?? delegate.deviceKey(),
     );
     for (final frame in frames) {
       socket.send(frame);
