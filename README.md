@@ -117,4 +117,25 @@ No keystroke logging, no analytics in the apps. Full detail in
 
 ## License
 
-Private repository. All rights reserved.
+All rights reserved. The source is public so the download links resolve and the
+work is visible, but no licence is granted to reuse it. Released binaries carry
+the same terms.
+
+## Downloading a build
+
+Signed APKs are published as GitHub Releases, split per CPU architecture:
+
+- `arm64-v8a` (23.9 MB) — essentially every phone made since 2017
+- `armeabi-v7a` (19.9 MB) — older or budget phones
+
+Verify the checksum before installing; they are published on the website's
+download page and in the release notes.
+
+The current release is a **UI build**: pairing, Slides and Mouse are real, but
+the transport does not exist yet, so the app cannot connect to a PC — that is
+Phase 4. The Windows companion is Phase 5 and has no installer yet.
+
+`mobile/build-release.ps1` builds and signs it, `mobile/publish-release.ps1`
+uploads it. The keystore lives outside the repository in
+`D:\Development\TapDesk-Secrets\` — back it up, because losing it means we can
+never update an app that is already installed.

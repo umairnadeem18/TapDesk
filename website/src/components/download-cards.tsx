@@ -149,6 +149,29 @@ export function DownloadCards() {
             </button>
           </div>
 
+          {RELEASES.android.variants.length > 1 ? (
+            <details className="mt-4 text-sm">
+              <summary className="cursor-pointer font-medium text-brand-dark hover:underline">
+                Not sure which one? Pick the second option if the first will not
+                install
+              </summary>
+              <ul className="mt-3 space-y-2">
+                {RELEASES.android.variants.slice(1).map((v) => (
+                  <li key={v.id} className="flex items-center justify-between gap-4">
+                    <span className="text-muted">{v.label}</span>
+                    <a
+                      href={v.url}
+                      download
+                      className="shrink-0 font-medium text-brand-dark underline hover:text-brand"
+                    >
+                      {v.size}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+
           <Checksum value={RELEASES.android.sha256} onCopy={copy} copied={copied} />
         </article>
 
@@ -203,14 +226,26 @@ export function DownloadCards() {
           </dl>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a
-              href={RELEASES.windows.url}
-              download
-              className="inline-flex min-h-13 flex-1 items-center justify-center gap-2 rounded-full bg-brand px-6 font-semibold text-white transition-colors hover:bg-brand-dark"
-            >
-              <Download className="h-5 w-5" aria-hidden />
-              Download .exe
-            </a>
+            {/* No installer exists yet - the companion is Phase 5. Rendering a
+                download button pointing nowhere would be worse than saying so. */}
+            {RELEASES.windows.url ? (
+              <a
+                href={RELEASES.windows.url}
+                download
+                className="inline-flex min-h-13 flex-1 items-center justify-center gap-2 rounded-full bg-brand px-6 font-semibold text-white transition-colors hover:bg-brand-dark"
+              >
+                <Download className="h-5 w-5" aria-hidden />
+                Download .exe
+              </a>
+            ) : (
+              <span
+                aria-disabled="true"
+                className="inline-flex min-h-13 flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-full bg-surface px-6 font-semibold text-ink/40"
+              >
+                <Download className="h-5 w-5" aria-hidden />
+                Not built yet
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setModal("desktop")}
@@ -220,7 +255,19 @@ export function DownloadCards() {
             </button>
           </div>
 
-          <Checksum value={RELEASES.windows.sha256} onCopy={copy} copied={copied} />
+          {RELEASES.windows.sha256 ? (
+            <Checksum
+              value={RELEASES.windows.sha256}
+              onCopy={copy}
+              copied={copied}
+            />
+          ) : (
+            <p className="mt-4 text-sm text-muted">
+              The Windows companion is still being built. The APK above is
+              ready to install, but it needs the companion to actually drive
+              this computer.
+            </p>
+          )}
         </article>
       </div>
 
