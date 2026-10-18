@@ -8,8 +8,9 @@ This document is the source of truth for build order. Each phase has a clear
 definition of done, and we do not start a phase until the previous one is
 finished and verified.
 
-**Status:** Phases 0–5 complete. Phase 7 is in progress (a signed APK is
-building). Phase 6 needs the physical phone, so it cannot be finished from here.
+**Status:** Phases 0–5 complete. Phase 6 underway - the product works on real
+hardware. Phase 7 in progress: site live, binaries published, keystore still
+needs backing up. The outstanding work is almost entirely failure cases.
 
 ---
 
@@ -379,9 +380,9 @@ work — with nothing but the public website as instructions.
 | 2 - App foundation | 5 | Complete |
 | 3 - Screens | 4 screens + settings | Complete; keyboard needs a look on a real device |
 | 4 - Transport | 7 | Complete, 160 tests |
-| 5 - Desktop companion | 14 | Complete except 5.14 (installer), 167 tests |
-| 6 - Integration and test | 7 | Blocked on the physical phone |
-| 7 - Release | 7 | In progress; website deployed, APK rebuilding |
+| 5 - Desktop companion | 14 | Complete, 190 tests, installer built and published |
+| 6 - Integration and test | 7 | In progress - happy path verified on hardware, failure cases outstanding |
+| 7 - Release | 7 | In progress; site live, binaries published, keystore still unbacked |
 | 8 - iOS and macOS | - | Deferred on purpose, see below |
 
 ### What "complete" means here, and what it does not
@@ -389,27 +390,66 @@ work — with nothing but the public website as instructions.
 Phases 4 and 5 are complete in the sense that both halves of the product are
 built, tested against each other, and work: a real phone app that pins a
 certificate and speaks the protocol, and a real companion that listens, asks
-its user for permission, and performs input. 160 Flutter tests and 167 Python
-tests, including six that drive the actual Dart socket against the actual Python
-companion over real TLS.
+its user for permission, and performs input. 175 Flutter tests and 190 Python
+tests, including tests that drive the actual Dart socket against the actual
+Python companion over real TLS.
 
-None of that is Phase 6. Every number above was produced by a machine talking to
-itself. Nothing has yet happened on a physical phone with a real PowerPoint
-open, and Phase 6 is where the product is actually judged.
+None of that is Phase 6. Every number above was produced by a machine talking
+to itself. Phase 6 is where the product is actually judged.
+
+### Verified on real hardware
+
+Confirmed working by a person, on a physical phone driving a real Windows
+machine. This is the list that matters — everything else above is a machine
+agreeing with itself.
+
+| Check | Result |
+|---|---|
+| Pairing from the QR code, Allow on the PC | works |
+| Slides: Previous, Next, Start, End, Black | works |
+| Mouse: left and right click, drag | works |
+| Mouse: analog stick moves the cursor | works |
+| Keyboard: letters, modifiers, shortcuts | works |
+| Back button, disconnect, return to pairing | works |
+| Exit from the app | works |
+| Reconnecting after the screen sleeps | works |
+| Start with Windows | works |
+
+Bugs found only by this testing, all of which had passed every automated test:
+
+- Mouse and keyboard were dead for the whole session. The tabs were built while
+  the PC was still deciding whether to allow the phone, and nothing rebuilt
+  them afterwards: the sink was not a `Listenable`, and the tab children were
+  `const`, so Flutter skipped their subtrees. Slides only *looked* alive
+  because disabled buttons still animate.
+- The analog stick reached the companion and stopped there. `stick` and `move`
+  were stored on the connection state and returned without ever being forwarded
+  to the input layer, so 60 well-formed frames a second were accepted and
+  discarded. Every other event type was forwarded, which is why only the stick
+  appeared broken.
+- Reconnecting never reconnected. The backoff timer fired and set the status to
+  "connecting"; nothing dialled the PC.
+
+The lesson, recorded because it cost three separate rounds of testing: a test
+that asserts nothing *complained* is not a test that something *happened*.
 
 ### Remaining work, in order
 
-1. **Phase 6, on hardware.** Pair a real phone, exercise all three tabs, and
-   measure latency on both home Wi-Fi and a hotspot. Task 6.5, the security
-   tests, and 6.6, no stuck keys after any disconnect, can only be believed
-   once a person has done this.
-2. **Task 5.14.** The companion runs from its venv but has no installer. Until
-   it is packaged with PyInstaller and Inno Setup, installing it means having
-   Python on the machine, which is not a thing we can ask a teacher to do.
-3. **Task 7.2.** The release keystore still needs backing up off this machine.
+1. **Failure cases on hardware.** Everything above was a happy path. The bugs
+   that remain are in what happens when things go wrong, and none of it is
+   reachable from a unit test:
+   - **No stuck keys or buttons after a disconnect** (task 6.6, and requirement
+     D8). Hold Ctrl, walk out of Wi-Fi range, walk back. Ctrl must not still
+     be down. This is the single most user-visible reliability promise in the
+     product and it is the one most likely to be quietly broken.
+   - PC sleep, then wake.
+   - Revoke the phone from the PC, then reconnect from the phone.
+   - Two phones, both paired.
+   - Latency on a phone hotspot, not just home Wi-Fi.
+2. **Task 7.2.** The release keystore still needs backing up off this machine.
    Losing it means never being able to update the app again.
-4. **Deployment protection on Vercel is still enabled**, so the website's
-   download links do not resolve for a visitor. One toggle.
+3. **Task 7.7.** Play Store preparation, once the above is solid.
+4. **Phase 8** remains deliberately untouched until Phase 7 has shipped.
 
 ### Phase 8 - iOS and macOS (deferred)
 
