@@ -65,11 +65,13 @@ class _AppShellState extends State<AppShell> {
             child: IndexedStack(
               index: _index,
               children: [
-                // Slides is built. Mouse and Keyboard land next; each replaces
-                // one placeholder, so the shell never changes shape again.
-                const SlidesTab(),
-                const MouseTab(),
-                const KeyboardTab(),
+                // Deliberately not `const`. An identical widget instance makes
+                // Flutter skip the subtree entirely, so a rebuild driven by the
+                // connection would leave the already-built tabs untouched -
+                // stale controls the user cannot use, with no indication why.
+                SlidesTab(),
+                MouseTab(),
+                KeyboardTab(),
               ],
             ),
           ),

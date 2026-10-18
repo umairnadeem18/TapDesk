@@ -24,7 +24,7 @@ import 'tapdesk_event.dart';
 /// The sink is always present so the UI never has to null-check it. Before
 /// there is a session, or after one ends, [isReady] is false and [send]
 /// refuses - the tabs stay on screen and inert rather than disappearing.
-class LiveEventSink implements EventSink {
+class LiveEventSink extends EventSink {
   LiveEventSink({
     required this.delegate,
     required this.keyStore,
@@ -91,7 +91,7 @@ class LiveEventSink implements EventSink {
 
     final session = TapDeskSession(
       factory: factory,
-      delegate: _Adapter(delegate, store),
+      delegate: _Adapter(delegate, store, notifyListeners),
       deviceName: deviceName,
       host: payload.ips.first,
       port: payload.port,
@@ -163,10 +163,16 @@ class _SessionStore implements SessionDelegate {
 
 /// Forwards the session's news to the real delegate while holding the key.
 class _Adapter implements SessionDelegate {
-  _Adapter(this._inner, this._store);
+  _Adapter(this._inner, this._store, this._onStatus);
 
   final SessionDelegate _inner;
   final _SessionStore _store;
+
+  /// Called after every status change so the sink can rebuild the UI. This is
+  /// the only place readiness is decided, so it is the only place that needs
+  /// to say so - and forgetting it is what left every tab disabled after the
+  /// PC had already said yes.
+  final void Function() _onStatus;
 
   @override
   String? deviceKey() => _store.deviceKey();
@@ -179,7 +185,10 @@ class _Adapter implements SessionDelegate {
   Future<void> forgetDeviceKey() => _store.forgetDeviceKey();
 
   @override
-  void onStatus(ConnectionInfo info) => _inner.onStatus(info);
+  void onStatus(ConnectionInfo info) {
+    _inner.onStatus(info);
+    _onStatus();
+  }
 
   @override
   void onError(String message) => _inner.onError(message);

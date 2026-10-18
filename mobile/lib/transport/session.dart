@@ -31,7 +31,7 @@ abstract class SessionDelegate {
 }
 
 /// Drives one socket from hello to connected, and relays input.
-class TapDeskSession implements EventSink {
+class TapDeskSession extends EventSink {
   TapDeskSession({
     required this.factory,
     required this.delegate,
@@ -58,6 +58,19 @@ class TapDeskSession implements EventSink {
 
   @override
   bool get isReady => _machine.status == ConnectionStatus.connected;
+
+  /// Called whenever [isReady] changes, so anything watching this session sees
+  /// the transition. The delegate is told separately - this is for whoever is
+  /// watching the object itself.
+  @override
+  void notifyListeners() {
+    final now = _machine.status == ConnectionStatus.connected;
+    if (now == _lastReady) return;
+    _lastReady = now;
+    super.notifyListeners();
+  }
+
+  bool _lastReady = false;
 
   @override
   int get sentCount => _sentCount;

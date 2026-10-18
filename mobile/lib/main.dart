@@ -77,7 +77,13 @@ class _TapDeskAppState extends State<TapDeskApp> {
         // screen before remembering what it knows.
         ChangeNotifierProvider(create: (_) => PairingStore()..load()),
         ChangeNotifierProvider(create: (_) => PreviewMode()),
-        Provider<EventSink>.value(value: _sink),
+        // ChangeNotifierProvider, not Provider: the tabs watch the sink to learn
+        // whether they may accept input, and watching a plain object never
+        // rebuilds anything. The tabs are built while the PC is still deciding
+        // whether to allow this phone, so every control starts disabled and
+        // has to be told when that changes - otherwise Mouse and Keyboard stay
+        // dead for the whole session.
+        ChangeNotifierProvider<EventSink>.value(value: _sink),
         ValueListenableProvider<String?>.value(value: _error),
       ],
       child: MaterialApp(
