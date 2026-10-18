@@ -105,6 +105,15 @@ class LiveEventSink extends EventSink {
       // "could not connect" would leave the user retrying forever against a
       // server that is never going to be the computer they paired with.
       delegate.onError(describeConnectFailure(error));
+      // Reporting the drop as well as the reason is what keeps the retry loop
+      // alive. Without it the status stayed `connecting` with nobody left to
+      // schedule the next attempt, and the app sat there for good.
+      delegate.onStatus(
+        ConnectionInfo(
+          status: ConnectionStatus.reconnecting,
+          pcName: payload.name,
+        ),
+      );
       _connecting = false;
       return false;
     }
@@ -112,6 +121,17 @@ class LiveEventSink extends EventSink {
     _session = session;
     _connecting = false;
     return true;
+  }
+
+  /// Re-open the connection to the PC we are already paired with.
+  ///
+  /// Used by the reconnect backoff. Takes no token on purpose: the saved device
+  /// key is what authenticates a phone that has been paired before, and a
+  /// pairing token is single-use and long since spent.
+  Future<bool> reconnect() async {
+    final target = _payload;
+    if (target == null) return false;
+    return connectTo(target);
   }
 
   Future<void> disconnect() async {

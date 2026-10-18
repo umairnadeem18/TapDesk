@@ -80,24 +80,29 @@ void main() {
         reason: 'a disconnected app must not queue input silently');
   });
 
-  testWidgets('the timer counts up and resets', (tester) async {
+  testWidgets('the lecture timer is gone, and nothing replaced it', (tester) async {
     await pumpApp(tester);
     await openSlides(tester);
 
-    expect(find.text('00:00'), findsOneWidget);
+    // Removed on purpose: it only counted up on the presenter's own phone,
+    // where they cannot see it, and took space from the controls they need.
+    // Time is not the phone's problem - they finish by disconnecting.
+    expect(find.textContaining('timer'), findsNothing);
+    expect(find.text('00:00'), findsNothing);
+  });
 
-    await tester.tap(find.text('Start timer'));
-    await tester.pumpAndSettle();
-    expect(find.text('Stop timer'), findsOneWidget);
+  group('the space the timer used', () {
+    testWidgets('Previous and Next keep their large targets', (tester) async {
+      await pumpApp(tester);
+      await openSlides(tester);
 
-    // Three seconds of a lecture timer.
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pump();
-    expect(find.text('00:03'), findsOneWidget);
-
-    await tester.tap(find.text('Stop timer'));
-    await tester.pumpAndSettle();
-    expect(find.text('00:00'), findsOneWidget);
+      // The controls are pressed while walking, without looking down, so they
+      // must not have shrunk to make room for a clock.
+      final next = tester.getSize(find.text('Next'));
+      expect(next.height, greaterThan(0));
+      expect(find.text('Previous'), findsOneWidget);
+      expect(find.text('Next'), findsOneWidget);
+    });
   });
 
   group('slide actions', () {

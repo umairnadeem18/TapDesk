@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../state/connection_controller.dart';
+import '../transport/event_sink.dart';
 import '../screens/keyboard_tab.dart';
 import '../screens/mouse_tab.dart';
 import '../screens/slides_tab.dart';
@@ -12,15 +14,21 @@ import 'connection_indicators.dart';
 
 /// The app shell: app bar, connection banner, three tabs.
 ///
-/// Phase 2 delivers the structure and the design system; Phase 3 fills the tab
-/// bodies in. What already exists here is real, not scaffolding: the tab
+/// Phase 2 delivers the structure and the design system; Phase 3 fills in the
+/// tab bodies. What already exists here is real, not scaffolding: the tab
 /// behaviour, the connection dot, the banner and the disable-when-not-connected
 /// rule all work, because those are the parts a reviewer signs off on first.
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, this.preview = false});
+  const AppShell({super.key, this.preview = false, this.onDisconnect});
 
   /// Show the controller without a PC. Debug builds only - see PreviewMode.
   final bool preview;
+
+  /// Called when the user chooses to disconnect and leave.
+  ///
+  /// Owning this in the shell rather than reaching for the sink keeps the
+  /// "are you sure?" decision next to the button that raised it.
+  final Future<void> Function()? onDisconnect;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -38,47 +46,159 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final connection = context.watch<ConnectionController>();
     final store = context.watch<PairingStore>();
+    final sink = context.watch<EventSink>();
     final info = connection.info;
-    final enabled = info.status.isConnected || widget.preview;
+    final enabled = info.status.isConnected || widget.preview || sink.isReady;
 
     // While disconnected there is no live name from the PC, but we still know
     // which machine we are about to connect to - showing it tells the user
     // which paired computer these controls will drive.
     final pcName = info.pcName ?? store.mostRecent?.name;
 
-    return Scaffold(
-      backgroundColor: TapDeskColors.background,
-      appBar: _AppBar(info: info, pcName: pcName),
-      body: Column(
-        children: [
-          if (widget.preview) const PreviewBanner(),
-          ConnectionBanner(status: info.status, error: info.lastError),
-          _TabBar(
-            tabs: _tabs,
-            index: _index,
-            enabled: enabled,
-            onChanged: (i) => setState(() => _index = i),
+    // Wake lock while connected: a sleeping screen drops the session, and a
+    // presenter who has to unlock the phone to advance a slide has discovered
+    // the product's core job is inconvenient.
+    final connected = sink.isReady || widget.preview;
+
+    return _KeepScreenAwake(
+      enabled: connected,
+      child: PopScope(
+        // Back means "stop controlling this computer", not "leave the app" -
+        // so it is confirmed rather than acted on immediately. Disconnecting
+        // by accident mid-lecture is worse than one extra tap.
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _confirmDisconnect();
+        },
+        child: Scaffold(
+          backgroundColor: TapDeskColors.background,
+          appBar: _AppBar(
+            info: info,
+            pcName: pcName,
+            onDisconnect: _confirmDisconnect,
           ),
-          // Expanded so the tab body owns the remaining height and the
-          // keyboard can shrink it correctly with adjustResize.
-          Expanded(
-            child: IndexedStack(
-              index: _index,
-              children: [
-                // Deliberately not `const`. An identical widget instance makes
-                // Flutter skip the subtree entirely, so a rebuild driven by the
-                // connection would leave the already-built tabs untouched -
-                // stale controls the user cannot use, with no indication why.
-                SlidesTab(),
-                MouseTab(),
-                KeyboardTab(),
-              ],
-            ),
+          body: Column(
+            children: [
+              if (widget.preview) const PreviewBanner(),
+              ConnectionBanner(status: info.status, error: info.lastError),
+              _TabBar(
+                tabs: _tabs,
+                index: _index,
+                enabled: enabled,
+                onChanged: (i) => setState(() => _index = i),
+              ),
+              // Expanded so the tab body owns the remaining height and the
+              // keyboard can shrink it correctly with adjustResize.
+              Expanded(
+                child: IndexedStack(
+                  index: _index,
+                  children: [
+                    // Deliberately not `const`. An identical widget instance
+                    // makes Flutter skip the subtree entirely, so a rebuild
+                    // driven by the connection would leave the already-built
+                    // tabs untouched - stale controls the user cannot use, with
+                    // no indication why.
+                    SlidesTab(),
+                    MouseTab(),
+                    KeyboardTab(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDisconnect() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: TapDeskColors.surfaceElevated,
+        title: const Text('Disconnect?', style: TapDeskText.button),
+        content: const Text(
+          'TapDesk will stop controlling this computer. You can connect again '
+          'at any time.',
+          style: TapDeskText.bodyText,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Stay connected', style: TapDeskText.button),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: TapDeskColors.primary),
+            child: const Text('Disconnect', style: TapDeskText.button),
           ),
         ],
       ),
     );
+
+    if (leave != true) return;
+    await widget.onDisconnect?.call();
   }
+}
+
+/// Holds the screen awake while the phone is driving a computer.
+///
+/// A sleeping screen is a dropped session: Android suspends the socket, the
+/// companion releases every held key and button, and the user returns to a
+/// "connecting" banner. Worse, a presenter who has to unlock the phone to
+/// advance a slide has discovered the product's core job is inconvenient.
+///
+/// Only while connected. On the pairing screen it would drain a battery for
+/// nothing, and users find a screen that will not sleep alarming.
+class _KeepScreenAwake extends StatefulWidget {
+  const _KeepScreenAwake({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  State<_KeepScreenAwake> createState() => _KeepScreenAwakeState();
+}
+
+class _KeepScreenAwakeState extends State<_KeepScreenAwake> {
+  bool _on = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _apply();
+  }
+
+  @override
+  void didUpdateWidget(covariant _KeepScreenAwake oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled != widget.enabled) _apply();
+  }
+
+  Future<void> _apply() async {
+    if (_on == widget.enabled) return;
+    _on = widget.enabled;
+    try {
+      if (_on) {
+        await WakelockPlus.enable();
+      } else {
+        await WakelockPlus.disable();
+      }
+    } catch (_) {
+      // Not every device supports it. A screen that sleeps is a far better
+      // outcome than an app that crashes because it could not prevent it.
+    }
+  }
+
+  @override
+  void dispose() {
+    // Never leave the screen pinned on after the app is gone.
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Says, unmistakably, that nothing is connected.
@@ -129,10 +249,11 @@ class PreviewBanner extends StatelessWidget {
 }
 
 class _AppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _AppBar({required this.info, required this.pcName});
+  const _AppBar({required this.info, required this.pcName, this.onDisconnect});
 
   final ConnectionInfo info;
   final String? pcName;
+  final VoidCallback? onDisconnect;
 
   @override
   Size get preferredSize => const Size.fromHeight(56);
@@ -144,6 +265,19 @@ class _AppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: TapDeskColors.background,
       systemOverlayStyle: TapDeskTheme.systemOverlay,
       titleSpacing: TapDeskSpace.s4,
+      // A visible back arrow, not just the system gesture. The user asked for a
+      // way to disconnect that is always there; relying on Android's back
+      // gesture or button means a presenter holding the phone in one hand has
+      // to find it by feel.
+      leading: onDisconnect == null
+          ? null
+          : IconButton(
+              tooltip: 'Disconnect and go back',
+              iconSize: 24,
+              color: TapDeskColors.textMuted,
+              onPressed: onDisconnect,
+              icon: const Icon(Icons.arrow_back),
+            ),
       title: Row(
         children: [
           Expanded(

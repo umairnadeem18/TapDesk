@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -22,35 +21,6 @@ class SlidesTab extends StatefulWidget {
 }
 
 class _SlidesTabState extends State<SlidesTab> {
-  /// Lecture pacing. Plan task 3.2.5.
-  Timer? _timer;
-  Duration _elapsed = Duration.zero;
-  bool _timerRunning = false;
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _toggleTimer() {
-    setState(() {
-      if (_timerRunning) {
-        _timer?.cancel();
-        _timer = null;
-        _timerRunning = false;
-        _elapsed = Duration.zero;
-      } else {
-        _timerRunning = true;
-        _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-          if (!mounted) return;
-          setState(() => _elapsed += const Duration(seconds: 1));
-        });
-      }
-    });
-    Haptics.tap();
-  }
-
   @override
   Widget build(BuildContext context) {
     final sink = context.watch<EventSink>();
@@ -122,13 +92,11 @@ class _SlidesTabState extends State<SlidesTab> {
               ],
             ),
           ),
-          const SizedBox(height: TapDeskSpace.s3),
-          _TimerBar(
-            running: _timerRunning,
-            elapsed: _elapsed,
-            enabled: enabled,
-            onToggle: _toggleTimer,
-          ),
+          // The lecture timer was removed on purpose. It only ever counted up
+          // on the presenter's own phone, where they cannot see it, and it
+          // competed for space with the controls they actually need. Time is
+          // not the phone's problem: they finish by disconnecting, from the PC
+          // or from the back button.
         ],
       ),
     );
@@ -263,62 +231,6 @@ class SecondarySlideButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// The lecture timer (plan task 3.2.5).
-///
-/// Local only — it paces the speaker, it is not sent to the PC. It runs even
-/// while disconnected, because pacing a lecture does not need a computer.
-class _TimerBar extends StatelessWidget {
-  const _TimerBar({
-    required this.running,
-    required this.elapsed,
-    required this.enabled,
-    required this.onToggle,
-  });
-
-  final bool running;
-  final Duration elapsed;
-  final bool enabled;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final minutes = elapsed.inMinutes;
-    final seconds = elapsed.inSeconds % 60;
-    final text = '${minutes.toString().padLeft(2, '0')}:'
-        '${seconds.toString().padLeft(2, '0')}';
-
-    return SizedBox(
-      height: TapDeskSpace.minTouchTarget,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              text,
-              // Monospace so the digits do not jitter as they change width.
-              style: TapDeskText.monoText.copyWith(
-                fontSize: 20,
-                color: running
-                    ? TapDeskColors.highlight
-                    : TapDeskColors.textMuted,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: onToggle,
-            style: TextButton.styleFrom(
-              foregroundColor: TapDeskColors.primary,
-              // A finite width, not Size.fromHeight - inside a Row that would
-              // ask for infinite width and throw during layout.
-              minimumSize: const Size(140, TapDeskSpace.minTouchTarget),
-            ),
-            child: Text(running ? 'Stop timer' : 'Start timer'),
-          ),
-        ],
       ),
     );
   }

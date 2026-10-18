@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'state/connection_controller.dart';
 import 'state/pairing_store.dart';
@@ -149,13 +150,51 @@ class _Root extends StatefulWidget {
   State<_Root> createState() => _RootState();
 }
 
-class _RootState extends State<_Root> {
+class _RootState extends State<_Root> with WidgetsBindingObserver {
+  /// True once the user has chosen to leave the connected session, so the
+  /// lifecycle handler stops trying to reconnect behind their back.
+  bool _userDisconnected = false;
+
+  /// True while the pairing screen is being shown despite a remembered PC.
+  /// Set by the back button.
+  bool _onHome = false;
+
   @override
   void initState() {
     super.initState();
-    // Connecting after the first frame: the providers are built during it,
-    // and reading them here would be reading a tree that does not exist yet.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _connectToRemembered());
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _wireReconnect();
+      await _connectToRemembered();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back to the foreground is the moment a dropped connection is
+    // noticed and the moment it is most worth retrying immediately. Left to
+    // the backoff, unlocking the phone shows a spinner for up to ten seconds
+    // and looks broken.
+    if (state == AppLifecycleState.resumed && !_userDisconnected) {
+      context.read<ConnectionController>().retryNow();
+    }
+  }
+
+  /// Give the controller something real to call when its backoff fires.
+  ///
+  /// Until this existed the timer only changed the label to "connecting" while
+  /// nothing dialled the PC - which is exactly the "connecting forever" report.
+  void _wireReconnect() {
+    final sink = context.read<EventSink>();
+    if (sink is! LiveEventSink) return;
+
+    context.read<ConnectionController>().onRetry = sink.reconnect;
   }
 
   /// Connect to the computer this phone was last paired with, if any.
@@ -167,15 +206,16 @@ class _RootState extends State<_Root> {
     final remembered = store.devices.isEmpty ? null : store.devices.last;
     if (remembered == null) return;
 
+    _userDisconnected = false;
     await sink.connectTo(
       PairingPayload(
         version: 1,
         name: remembered.name,
         ips: [remembered.host],
         port: remembered.port,
-        // No token: this PC is already paired, so the saved device key is
-        // what authenticates. The companion deliberately does not re-prompt
-        // for a device it already trusts.
+        // No token: this PC is already paired, so the saved device key is what
+        // authenticates. The companion deliberately does not re-prompt for a
+        // device it already trusts.
         token: '',
         fingerprint: remembered.fingerprint,
       ),
@@ -193,27 +233,47 @@ class _RootState extends State<_Root> {
     // there is no PC and no pairing.
     if (preview) return const AppShell(preview: true);
 
-    if (!hasPaired) {
-      return PairingScreen(
-        onPaired: _onPaired,
-        onReconnect: (_) => _connectToRemembered(),
-      );
+    // `_onHome` is how the user gets back to scanning. Deliberately a flag
+    // rather than a pushed route: two sources of truth for "which screen am I
+    // on" is how you end up with a pairing screen stacked on top of a live
+    // session that is still holding the connection open.
+    if (!_onHome && hasPaired) {
+      return AppShell(onDisconnect: _disconnectAndGoHome);
     }
-    return const AppShell();
+    return PairingScreen(
+      onPaired: _onPaired,
+      onReconnect: (_) => _connectToRemembered(),
+    );
+  }
+
+  /// Stop controlling the computer and return to the pairing screen.
+  ///
+  /// Leaves the pairing intact: forgetting it would mean re-doing the whole
+  /// Allow prompt on the PC to use a computer that is still paired. What is
+  /// being ended is the *connection*, which is what the user asked to stop.
+  Future<void> _disconnectAndGoHome() async {
+    _userDisconnected = true;
+
+    final sink = context.read<EventSink>();
+    if (sink is LiveEventSink) {
+      await sink.disconnect();
+    }
+    if (!mounted) return;
+
+    context.read<ConnectionController>().goTo(ConnectionStatus.idle);
+    setState(() => _onHome = true);
   }
 
   Future<void> _onPaired(PairingPayload payload) async {
     final sink = context.read<EventSink>();
     if (sink is LiveEventSink) {
+      _userDisconnected = false;
       // The token is passed straight through and never stored. It is
       // single-use; once the companion has spent it, the saved device key
       // takes over for good.
       await sink.connectTo(payload, token: payload.token);
     }
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const AppShell()),
-      (route) => false,
-    );
+    setState(() => _onHome = false);
   }
 }

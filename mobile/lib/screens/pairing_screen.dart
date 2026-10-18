@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
@@ -94,7 +95,7 @@ class _PairingScreenState extends State<PairingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _Header(onClose: () => Navigator.of(context).maybePop()),
+            _Header(onClose: () => SystemNavigator.pop()),
             Expanded(
               child: _rationaleShown
                   ? _scannerView()
@@ -103,7 +104,8 @@ class _PairingScreenState extends State<PairingScreen> {
                       _startScanner();
                     }),
             ),
-            if (store.hasPairedDevices) _RememberedDevices(store: store),
+            if (store.hasPairedDevices)
+          _RememberedDevices(store: store, onReconnect: widget.onReconnect),
             _ManualEntryButton(
               onPressed: _busy
                   ? null
@@ -203,21 +205,20 @@ class _Header extends StatelessWidget {
           Expanded(
             child: Text('Pair with a computer', style: TapDeskText.button),
           ),
-          // Only offered when there is somewhere to go back to.
+          // Always present, and always does something.
           //
-          // On a fresh install this screen is the home route, so `maybePop`
-          // had nothing to pop and the button did nothing at all - a visible
-          // control that silently failed, which is the worst kind of bug in a
-          // UI. Either it works or it is not drawn.
-          if (Navigator.of(context).canPop())
-            IconButton(
-              tooltip: 'Close',
-              onPressed: onClose,
-              icon: const Icon(Icons.close),
-              color: TapDeskColors.textMuted,
+          // This used to be a close button that was only drawn when
+          // `Navigator.canPop()` was true - which on a fresh install is never,
+          // because pairing is the home route. So the user had no way to leave
+          // the app at all. Either a control works or it is not drawn.
+          TextButton(
+            onPressed: onClose,
+            style: TextButton.styleFrom(
+              foregroundColor: TapDeskColors.textMuted,
+              minimumSize: const Size(72, TapDeskSpace.minTouchTarget),
             ),
-          if (!Navigator.of(context).canPop())
-            const SizedBox(width: TapDeskSpace.s4),
+            child: const Text('Exit', style: TapDeskText.button),
+          ),
         ],
       ),
     );
@@ -401,9 +402,12 @@ class _CornerPainter extends CustomPainter {
 /// Remembered PCs, so a paired phone reconnects without scanning again
 /// (plan task 3.1.6).
 class _RememberedDevices extends StatelessWidget {
-  const _RememberedDevices({required this.store});
+  const _RememberedDevices({required this.store, this.onReconnect});
 
   final PairingStore store;
+
+  /// Reconnect to a computer this phone is already paired with.
+  final void Function(PairedDevice device)? onReconnect;
 
   @override
   Widget build(BuildContext context) {
@@ -419,24 +423,33 @@ class _RememberedDevices extends StatelessWidget {
           Text('PAIRED COMPUTERS', style: TapDeskText.label),
           const SizedBox(height: TapDeskSpace.s2),
           for (final device in devices)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              minVerticalPadding: TapDeskSpace.s2,
-              leading: const Icon(Icons.computer,
-                  color: TapDeskColors.primary),
-              title: Text(device.name, style: TapDeskText.bodyText),
-              subtitle: Text(
-                '${device.host}:${device.port}',
-                style: TapDeskText.label,
-              ),
-              trailing: const Icon(Icons.chevron_right,
-                  color: TapDeskColors.textMuted),
+            // Its own Material, so the tap ripple is visible. A ListTile
+            // paints its splash on the nearest Material ancestor, and the
+            // ColouredBox above is closer than the Scaffold - so the row looked
+            // completely dead when pressed, which on a "tap this to reconnect"
+            // row is exactly the wrong thing.
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                minVerticalPadding: TapDeskSpace.s2,
+                leading: const Icon(Icons.computer,
+                    color: TapDeskColors.primary),
+                title: Text(device.name, style: TapDeskText.bodyText),
+                subtitle: Text(
+                  '${device.host}:${device.port}',
+                  style: TapDeskText.label,
+                ),
+                trailing: const Icon(Icons.chevron_right,
+                    color: TapDeskColors.textMuted),
               onTap: () {
-                Navigator.of(context).maybePop();
-                // The reconnect path is wired in Phase 4, when a device key
-                // exists to present. Until then the choice is still offered so
-                // the layout and wording can be reviewed.
+                // Phase 4 exists now, so this reconnects for real rather than
+                // just closing the sheet. A row labelled with a computer's name
+                // and address that does nothing when tapped is worse than not
+                // offering it.
+                onReconnect?.call(device);
               },
+              ),
             ),
         ],
       ),

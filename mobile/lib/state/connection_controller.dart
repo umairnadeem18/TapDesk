@@ -219,15 +219,55 @@ class ConnectionController extends ChangeNotifier {
   /// would use.
   int get currentRetryDelayMs => _retryMs;
 
+  /// Re-dials the socket. Supplied by the transport, because only it knows how
+  /// to open a connection; the controller owns *when*, not *how*.
+  ///
+  /// This was the missing half of reconnecting. The timer below used to fire
+  /// and set the status to `connecting`, which showed a spinner forever: the
+  /// label said connecting while nothing was actually dialling the PC. The
+  /// symptom - "it says connecting and never stabilises" - was really the app
+  /// politely lying about work it had stopped doing.
+  Future<void> Function()? onRetry;
+
   /// Schedule the next reconnect attempt and move to `reconnecting`.
   void scheduleReconnect() {
     _retryMs = _backoff.delayFor(_attempt);
     _attempt++;
     goTo(ConnectionStatus.reconnecting);
     _retryTimer?.cancel();
-    _retryTimer = Timer(Duration(milliseconds: _retryMs), () {
+    _retryTimer = Timer(Duration(milliseconds: _retryMs), () async {
       goTo(ConnectionStatus.connecting);
+      try {
+        await onRetry?.call();
+      } catch (error) {
+        // The attempt itself failed rather than reporting a drop. Ask for
+        // another one, or the app sits in `connecting` forever - which is the
+        // same bug from the other direction.
+        scheduleReconnect();
+      }
     });
+  }
+
+  /// Retry immediately, skipping the remaining backoff.
+  ///
+  /// Used when the app comes back to the foreground. Waiting out a 10 second
+  /// backoff after the user has unlocked their phone looks broken, and the
+  /// delay exists for a loop, not for one deliberate attempt.
+  void retryNow() {
+    if (_info.status == ConnectionStatus.connected) return;
+    _attempt = 0;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    goTo(ConnectionStatus.connecting);
+    unawaited(_runRetry());
+  }
+
+  Future<void> _runRetry() async {
+    try {
+      await onRetry?.call();
+    } catch (_) {
+      scheduleReconnect();
+    }
   }
 
   /// Called by the transport when a connection is established.
