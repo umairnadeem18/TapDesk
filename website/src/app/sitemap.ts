@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 
-const base = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tapdesk.app";
+import { siteUrl } from "@/content/site-url";
+
+
+
+const base = siteUrl();
 
 const lastModified = new Date("2026-10-13");
 

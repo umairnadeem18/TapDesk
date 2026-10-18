@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+
+import { siteUrl } from "@/content/site-url";
 import { Inter, Poppins } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -17,10 +19,10 @@ const poppins = Poppins({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tapdesk.app";
+
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(siteUrl()),
   title: {
     default: "TapDesk — Turn your phone into a wireless mouse, slide clicker & keyboard",
     template: "%s | TapDesk",
@@ -40,7 +42,7 @@ export const metadata: Metadata = {
   creator: "TapDesk",
   openGraph: {
     type: "website",
-    url: siteUrl,
+    url: siteUrl(),
     siteName: "TapDesk",
     title: "TapDesk — Your phone is the mouse. Your desk is the stage.",
     description:
