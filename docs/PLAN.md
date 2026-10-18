@@ -459,6 +459,59 @@ Bugs found only by this testing, all of which had passed every automated test:
 The lesson, recorded because it cost three separate rounds of testing: a test
 that asserts nothing *complained* is not a test that something *happened*.
 
+### OPEN BUG - pairing fails after the beta.3 PC reinstall (2026-10-18)
+
+**Reported by the user on real hardware. Undiagnosed. Nothing was changed in
+response - recorded only, to be picked up next session.**
+
+What happened, in the user's terms: after reinstalling `TapDesk-1.0.0-setup.exe`
+from v1.0.0-beta.3 and installing the matching APK over the top of the previous
+one, **the QR code no longer pairs**. There are two distinct symptoms, and
+whether it is one bug or two is not yet known:
+
+- The pairing screen **loads continuously** and never resolves.
+- Or the app **gets as far as the slides layout and says "disconnected"**.
+
+This is a regression against beta.2, where pairing worked on this exact setup.
+The only changes since are the settings work: two new messages (`set`,
+`forget`), the `settings` push added to the post-`auth_ok` greeting, and the
+settings screen itself.
+
+Hypotheses, in the order worth checking. **None of these have been tested -
+they are a starting order, not findings.**
+
+1. **The reinstall moved or regenerated the companion's certificate.** Pairing is
+   keyed on the certificate fingerprint, not the IP address, precisely so that a
+   network change does not break it. If the reinstall landed on a different
+   config directory, the fingerprint in the QR is one the phone has never seen,
+   and the phone also still holds a stored pairing for the *old* fingerprint.
+   The two would fight, and a phone trying a dead stored pairing before trying
+   a perfectly good scanned one would look exactly like a pairing that hangs.
+   Worth checking first, because it is the most likely and the cheapest to
+   confirm: compare the fingerprint in the QR against the one stored in the
+   phone's paired-device list, and against `%LOCALAPPDATA%\Programs\TapDesk`.
+2. **The `settings` push is a new frame in the post-`auth_ok` greeting**, and
+   three tests read a fixed number of frames at that point rather than by name.
+   All three were fixed and pass, but the pairing screen is the one place where
+   an unexpected frame during the handshake would stall rather than error -
+   worth confirming the phone tolerates it rather than waiting for a frame that
+   the handshake machine does not recognise in the state it is in.
+3. **A message-order or validation failure in the new companion build.** The
+   Python suite is 200 green and the phone suite 177, but every one of those
+   tests starts a companion from source, never the PyInstaller-packaged exe the
+   user actually installed. A packaging difference - a stale `.pyc`, a missing
+   module collected into the bundle - would pass every test in the repository
+   and fail only in the shipped binary.
+
+Note that the settings screen itself has therefore **not yet been verified on
+hardware at all**, and neither has cursor speed, which was the main reason for
+building it. Treat v1.0.0-beta.3 as untested rather than as a working release.
+
+Also still outstanding from this session: the website deploy. The source is
+correct and committed, but Vercel needs a token this session did not have, and
+the standing rule is that the token is never pasted into chat. The live site
+therefore still serves beta.2.
+
 ### Remaining work, in order
 
 1. **Failure cases on hardware.** Everything above was a happy path. The bugs
