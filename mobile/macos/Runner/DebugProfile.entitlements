@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The companion runs on a PC on the same network, so the app makes
+	     outgoing connections to it. Without this entitlement the App Sandbox
+	     refuses every socket and the app looks like it simply cannot connect. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+
+	<!-- Scanning the pairing QR code. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
+
+	<!-- Keys and saved pairings live in the Keychain, reached through
+	     flutter_secure_storage, which needs this to be reachable from a
+	     sandboxed app. -->
+	<key>com.apple.security.keychain</key>
+	<true/>
+</dict>
+</plist>

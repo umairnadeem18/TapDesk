@@ -41,30 +41,105 @@ final Directory approvingConfigDir = Directory(
   '${Directory.systemTemp.path}/tapdesk-cross-approve-${DateTime.now().microsecondsSinceEpoch}',
 );
 
-Process? approving;
+/// The test fixture that approves pairing, while it is running.
+_Child? approving;
 
-Process? companion;
+/// The strict companion the shipped entry point starts.
+_Child? companion;
 
 bool get built => python.existsSync();
 
 /// Wait for the companion to bind, rather than sleeping and hoping.
-Future<void> _waitForPort(int port, {Duration timeout = const Duration(seconds: 25)}) async {
+///
+/// On failure it reports what the child actually printed. "The companion never
+/// listened on port 8876" was all the information a failure gave, which is why
+/// a slow start was indistinguishable from a broken build - the test was
+/// reporting its own impatience as if it were a finding.
+/// A launched child process, with its output kept so a failure can explain
+/// itself.
+///
+/// `Process.stderr` is a stream of bytes, not a future of text, so reading it
+/// after the fact means subscribing. Keeping a small buffer from launch is what
+/// lets a timeout report "here is what the companion said" instead of "the
+/// companion never listened", which told nobody anything.
+class _Child {
+  _Child(this.process);
+
+  final Process process;
+  final StringBuffer _err = StringBuffer();
+  final StringBuffer _out = StringBuffer();
+  final Completer<int> _exited = Completer<int>();
+
+  String get output {
+    final text = _err.toString().trim();
+    return text.isEmpty ? _out.toString().trim() : text;
+  }
+
+  /// Whether it has already exited.
+  bool get hasExited => _exited.isCompleted;
+
+  int? get exitCode => _code;
+  int? _code;
+
+  static Future<_Child> start(
+    String executable,
+    List<String> args, {
+    required String workingDirectory,
+  }) async {
+    final child = _Child(
+      await Process.start(executable, args, workingDirectory: workingDirectory),
+    );
+    child.process.stderr
+        .transform(const SystemEncoding().decoder)
+        .listen(child._err.write)
+        .onDone(() {});
+    child.process.stdout
+        .transform(const SystemEncoding().decoder)
+        .listen(child._out.write)
+        .onDone(() {});
+    unawaited(
+      child.process.exitCode.then((code) {
+        if (!child._exited.isCompleted) child._exited.complete(code);
+      }),
+    );
+    return child;
+  }
+}
+
+/// Wait for a companion to bind, rather than sleeping and hoping.
+Future<void> _waitForPort(
+  int port, {
+  required _Child child,
+  String label = 'companion',
+  Duration timeout = const Duration(seconds: 45),
+}) async {
   final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
+    if (child.hasExited) {
+      fail(
+        'the $label exited before it could listen (exit ${child.exitCode}).\n'
+        'Its own output:\n${child.output}',
+      );
+    }
     try {
-      final socket = await Socket.connect('127.0.0.1', port, timeout: const Duration(seconds: 1));
+      final socket =
+          await Socket.connect('127.0.0.1', port, timeout: const Duration(seconds: 1));
       socket.destroy();
       return;
     } catch (_) {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
   }
-  fail('the companion never listened on port $port');
+  fail(
+    'the $label never listened on port $port within ${timeout.inSeconds}s.\n'
+    'It has not exited, so this is a slow start or a port clash rather than a '
+    'crash.\nIts own output:\n${child.output}',
+  );
 }
 
 /// Start a companion on [port].
 Future<void> _startCompanion(int port) async {
-  companion = await Process.start(
+  companion = await _Child.start(
     python.path,
     [
       '-m',
@@ -77,7 +152,7 @@ Future<void> _startCompanion(int port) async {
     ],
     workingDirectory: '../companion',
   );
-  await _waitForPort(port);
+  await _waitForPort(port, child: companion!);
 }
 
 /// Start the test fixture that approves pairing.
@@ -86,7 +161,7 @@ Future<void> _startCompanion(int port) async {
 /// anyone who can reach the port is exactly what the Allow prompt exists to
 /// withhold, and it should not be one mistyped argument away from every user.
 Future<void> _startApprovingCompanion() async {
-  approving = await Process.start(
+  approving = await _Child.start(
     python.path,
     [
       'tests/approve_server.py',
@@ -97,7 +172,7 @@ Future<void> _startApprovingCompanion() async {
     ],
     workingDirectory: '../companion',
   );
-  await _waitForPort(approvingPort);
+  await _waitForPort(approvingPort, child: approving!, label: 'approving fixture');
 }
 
 /// The companion's own view of its pairing link.
@@ -224,9 +299,9 @@ void main() {
   });
 
   tearDown(() {
-    companion?.kill(ProcessSignal.sigterm);
+    companion?.process.kill(ProcessSignal.sigterm);
     companion = null;
-    approving?.kill(ProcessSignal.sigterm);
+    approving?.process.kill(ProcessSignal.sigterm);
     approving = null;
   });
 
