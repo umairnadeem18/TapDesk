@@ -131,6 +131,20 @@ export function DownloadCards() {
             ))}
           </dl>
 
+          {/* Written because it was genuinely confusing, not as decoration.
+              The file is small because it is built only for the phone
+              architecture you are downloading it for. A single universal APK
+              would carry three copies of the engine and be roughly three
+              times the size, and the debug builds people compare against are
+              larger again for unrelated reasons. */}
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            {RELEASES.android.size} is not a mistake — the download is built
+            only for your phone&rsquo;s processor, which is why it is small
+            rather than one file that has to contain every phone. Almost every
+            phone made since 2017 wants the {RELEASES.android.variants[0]?.size}{" "}
+            option below.
+          </p>
+
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a
               href={RELEASES.android.url}
