@@ -524,6 +524,7 @@ class Companion:
             on_revoke=self.revoke,
             on_quit=self._quit,
             on_safe_mode=self.set_safe_mode,
+            on_autostart=set_autostart,
         )
 
         self._window = MainWindow(callbacks)
@@ -534,6 +535,8 @@ class Companion:
         self._tray = Tray(callbacks)
         self._tray.show_requested = self._window.show
         self._tray.activated.connect(self._on_tray_activated)
+        # Shows the real current state, so the tick is never a guess.
+        self._window.set_autostart_checked(is_autostart_enabled())
 
         try:
             self.start_backend()
@@ -678,6 +681,62 @@ class Companion:
             pass
 
 
+def set_autostart(enabled: bool) -> bool:
+    """Start TapDesk when Windows starts, or stop doing so.
+
+    Implemented through the registry Run key rather than a Startup folder
+    shortcut, because the registry entry survives the app being moved or
+    reinstalled to a different folder, and because it can be inspected without
+    the user hunting through AppData.
+
+    Returns True if the state now matches what was asked for.
+
+    Deliberately off by default and opt-in. A teacher should never find a
+    program they installed quietly starting itself on a school laptop, and a
+    surprise autostart that cannot be turned off is how software earns a
+    reputation for being malware.
+    """
+    import winreg
+
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE
+        ) as key:
+            if enabled:
+                command = f'"{sys.executable}"'
+                winreg.SetValueEx(key, "TapDesk", 0, winreg.REG_SZ, command)
+            else:
+                try:
+                    winreg.DeleteValue(key, "TapDesk")
+                except FileNotFoundError:
+                    pass
+        return True
+    except OSError as exc:
+        log.warning("could not change autostart: %s", exc)
+        return False
+
+
+def is_autostart_enabled() -> bool:
+    """Whether TapDesk is currently set to start with Windows."""
+    import winreg
+
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_READ,
+        ) as key:
+            winreg.QueryValueEx(key, "TapDesk")
+            return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="tapdesk", description="The TapDesk desktop companion."
@@ -702,6 +761,11 @@ def main(argv: list[str] | None = None) -> int:
         help="print the pairing link and exit",
     )
     parser.add_argument(
+        "--autostart",
+        choices=("on", "off"),
+        help="start TapDesk automatically when Windows starts, or stop doing so",
+    )
+    parser.add_argument(
         "-v", "--verbose", action="store_true", help="log everything"
     )
     args = parser.parse_args(argv)
@@ -714,6 +778,25 @@ def main(argv: list[str] | None = None) -> int:
     companion = Companion(
         config_dir=args.config_dir, port=args.port, headless=args.headless
     )
+
+    # Autostart is a setting change, not a run: it must work whether or not the
+    # companion is currently running, so it is handled before the app starts and
+    # reports plainly rather than setting a flag nobody sees.
+    if args.autostart is not None:
+        wanted = args.autostart == "on"
+        if set_autostart(wanted):
+            print(
+                "TapDesk will start when Windows starts."
+                if wanted
+                else "TapDesk will no longer start with Windows."
+            )
+            return 0
+        print(
+            "Could not change the autostart setting. Try again, or set it "
+            "manually: Task Manager > Startup apps.",
+            file=sys.stderr,
+        )
+        return 1
 
     # Checked before anything is constructed. Minting a fresh session here would
     # print a token the running server has never heard of, which is worse than

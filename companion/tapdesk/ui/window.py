@@ -19,6 +19,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -76,6 +77,8 @@ class UiCallbacks:
     on_revoke: Callable[[str], None]
     on_quit: Callable[[], None]
     on_safe_mode: Callable[[bool], None] | None = None
+    on_autostart: Callable[[bool], None] | None = None
+    on_revoke_self: Callable[[], None] | None = None
 
 
 class MainWindow(QWidget):
@@ -240,6 +243,17 @@ class MainWindow(QWidget):
         layout.addWidget(self._disconnect)
         layout.addWidget(self._safe_mode)
 
+        # Opt-in, never on by default. A teacher should not install a program
+        # that has already decided to start itself on a school laptop; if this
+        # were ticked automatically it would be the first thing anyone noticed.
+        self._autostart = QCheckBox("Start when Windows starts")
+        self._autostart.setToolTip(
+            "Open the QR code automatically after a restart, without "
+            "finding the folder or double-clicking anything."
+        )
+        self._autostart.toggled.connect(self._on_autostart)
+        layout.addWidget(self._autostart)
+
         # The escape hatch has to be discoverable or it does not exist. It is
         # in the tray as well, but a user who has lost the window has no tray
         # yet, and this is the one control that must always be reachable.
@@ -260,6 +274,22 @@ class MainWindow(QWidget):
         )
         if not enabled:
             self._status_text.setText("")
+
+    def _on_autostart(self, enabled: bool) -> None:
+        if self._callbacks.on_autostart is None:
+            return
+        if not self._callbacks.on_autostart(enabled):
+            # Unticks itself rather than pretending it worked. A checkbox that
+            # shows a tick for a setting that was not applied is a lie the user
+            # will not discover until after a restart.
+            self._autostart.blockSignals(True)
+            self._autostart.setChecked(not enabled)
+            self._autostart.blockSignals(False)
+
+    def set_autostart_checked(self, enabled: bool) -> None:
+        self._autostart.blockSignals(True)
+        self._autostart.setChecked(enabled)
+        self._autostart.blockSignals(False)
 
     # -- updates -----------------------------------------------------------
 
