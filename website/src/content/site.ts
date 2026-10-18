@@ -3,14 +3,18 @@
  *
  * Two rules that are easy to break by accident:
  *
- * 1. The URL pins the tag (eleases/download/v1.0.0-beta.1/...) rather than
- *    using eleases/latest. latest EXCLUDES prereleases, so a beta link
- *    built on it 404s - which is exactly what happened the first time.
- *    Pinning the tag also means the published SHA-256 always belongs to the
- *    file being downloaded.
+ * 1. The URL pins the tag rather than using /releases/latest. latest EXCLUDES
+ *    prereleases, so a beta link built on it 404s - which is exactly what
+ *    happened the first time. Pinning the tag also means the published SHA-256
+ *    always belongs to the file being downloaded.
  *
- * 2. The repo used to be 	apdesk/tapdesk, which does not exist. A visitor
- *    following that link got a 404 with no way to tell why.
+ *    Every build changes these values, and a stale checksum is worse than no
+ *    checksum: a user verifying their download would be told their file was
+ *    tampered with when it was not. Recompute both on each release and confirm
+ *    every URL answers 200 before committing.
+ *
+ * 2. The repo used to be umairnadeem18/TapDesk under a different name that did
+ *    not exist. A visitor following that link got a 404 with no way to tell why.
  *
  * The APK is split per CPU architecture. arm64-v8a covers essentially every
  * phone made since 2017; armeabi-v7a is the fallback for older or cheaper
@@ -18,40 +22,40 @@
  */
 export const RELEASES = {
   android: {
-    version: "v1.0.0-beta.1",
-    size: "24.1 MB",
+    version: "v1.0.0-beta.2",
+    size: "24.5 MB",
     minAndroid: "Android 8.0 (API 26)",
-    // SHA-256 of TapDesk-v1.0.0-beta.1-arm64-v8a.apk
+    // SHA-256 of TapDesk-v1.0.0-beta.2-arm64-v8a.apk
     sha256:
-      "632c7f9e911dabdcec3f370ac22db964fe460ca162a3067cabbba0f2cb9f3a4b",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.1/TapDesk-v1.0.0-beta.1-arm64-v8a.apk",
+      "5cf4400e4f7a32ccffbc21b0bf992177b917b9f645576cb73e0d401c12857b2e",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.2/TapDesk-v1.0.0-beta.2-arm64-v8a.apk",
     variants: [
       {
         id: "arm64-v8a",
         label: "Most phones (2017 and newer)",
-        size: "24.1 MB",
+        size: "24.5 MB",
         sha256:
-          "632c7f9e911dabdcec3f370ac22db964fe460ca162a3067cabbba0f2cb9f3a4b",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.1/TapDesk-v1.0.0-beta.1-arm64-v8a.apk",
+          "5cf4400e4f7a32ccffbc21b0bf992177b917b9f645576cb73e0d401c12857b2e",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.2/TapDesk-v1.0.0-beta.2-arm64-v8a.apk",
       },
       {
         id: "armeabi-v7a",
         label: "Older or budget phones",
-        size: "20.0 MB",
+        size: "20.5 MB",
         sha256:
-          "47cf7c1e8fb1dec7e4fee29ae0ee7343b986d0367dafac50dfc041439b3a9756",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.1/TapDesk-v1.0.0-beta.1-armeabi-v7a.apk",
+          "21384e3098811cf99be1b3d710695511ae36ab5d01eab7247c38ff02388eee83",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.2/TapDesk-v1.0.0-beta.2-armeabi-v7a.apk",
       },
     ],
   },
   windows: {
-    version: "not built yet",
-    size: "-",
+    version: "v1.0.0",
+    size: "58.7 MB",
     minWindows: "Windows 10 / 11 (64-bit)",
-    // The companion is Phase 5. There is no installer to point at, and
-    // publishing an invented checksum or URL would be worse than saying so.
-    sha256: "",
-    url: "",
+    // SHA-256 of TapDesk-1.0.0-setup.exe
+    sha256:
+      "17c6c1fdf6babfaef25c469c29ff98e241a82bdc6fa1f8740dc96cabffdb48ca",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.2/TapDesk-1.0.0-setup.exe",
   },
 };
 

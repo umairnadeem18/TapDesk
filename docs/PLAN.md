@@ -8,7 +8,8 @@ This document is the source of truth for build order. Each phase has a clear
 definition of done, and we do not start a phase until the previous one is
 finished and verified.
 
-**Status:** Phase 0 complete, Phase 1 complete. Phase 2 has not started.
+**Status:** Phases 0–5 complete. Phase 7 is in progress (a signed APK is
+building). Phase 6 needs the physical phone, so it cannot be finished from here.
 
 ---
 
@@ -375,13 +376,40 @@ work — with nothing but the public website as instructions.
 |---|---|---|
 | 0 - Toolchain | 7 | Complete |
 | 1 - Freeze the contract | 4 | Complete |
-| 2 - App foundation | 5 | Not started |
-| 3 - Screens | 4 screens + settings | Not started |
-| 4 - Transport | 7 | Not started |
-| 5 - Desktop companion | 14 | Not started |
-| 6 - Integration and test | 7 | Not started |
-| 7 - Release | 7 | Not started |
+| 2 - App foundation | 5 | Complete |
+| 3 - Screens | 4 screens + settings | Complete; keyboard needs a look on a real device |
+| 4 - Transport | 7 | Complete, 160 tests |
+| 5 - Desktop companion | 14 | Complete except 5.14 (installer), 167 tests |
+| 6 - Integration and test | 7 | Blocked on the physical phone |
+| 7 - Release | 7 | In progress; website deployed, APK rebuilding |
 | 8 - iOS and macOS | - | Deferred on purpose, see below |
+
+### What "complete" means here, and what it does not
+
+Phases 4 and 5 are complete in the sense that both halves of the product are
+built, tested against each other, and work: a real phone app that pins a
+certificate and speaks the protocol, and a real companion that listens, asks
+its user for permission, and performs input. 160 Flutter tests and 167 Python
+tests, including six that drive the actual Dart socket against the actual Python
+companion over real TLS.
+
+None of that is Phase 6. Every number above was produced by a machine talking to
+itself. Nothing has yet happened on a physical phone with a real PowerPoint
+open, and Phase 6 is where the product is actually judged.
+
+### Remaining work, in order
+
+1. **Phase 6, on hardware.** Pair a real phone, exercise all three tabs, and
+   measure latency on both home Wi-Fi and a hotspot. Task 6.5, the security
+   tests, and 6.6, no stuck keys after any disconnect, can only be believed
+   once a person has done this.
+2. **Task 5.14.** The companion runs from its venv but has no installer. Until
+   it is packaged with PyInstaller and Inno Setup, installing it means having
+   Python on the machine, which is not a thing we can ask a teacher to do.
+3. **Task 7.2.** The release keystore still needs backing up off this machine.
+   Losing it means never being able to update the app again.
+4. **Deployment protection on Vercel is still enabled**, so the website's
+   download links do not resolve for a visitor. One toggle.
 
 ### Phase 8 - iOS and macOS (deferred)
 

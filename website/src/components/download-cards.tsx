@@ -226,8 +226,10 @@ export function DownloadCards() {
           </dl>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            {/* No installer exists yet - the companion is Phase 5. Rendering a
-                download button pointing nowhere would be worse than saying so. */}
+            {/* Both branches are live: the phone build and the Windows installer now
+                exist, but the fallback stays so a build that has not been
+                published yet shows "Not built yet" rather than a download
+                button pointing at nothing. */}
             {RELEASES.windows.url ? (
               <a
                 href={RELEASES.windows.url}
