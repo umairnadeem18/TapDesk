@@ -87,6 +87,7 @@ class PairingServer:
         on_event: Callable[[ConnectionState, dict[str, Any]], None] | None = None,
         on_approval_request: Callable[[str, str], Awaitable[bool]] | None = None,
         on_release: Callable[[], None] | None = None,
+        settings_provider: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         self._ssl = cert
         self._devices = devices
@@ -94,6 +95,7 @@ class PairingServer:
         self._on_event = on_event or (lambda state, message: None)
         self._on_approval = on_approval_request
         self._on_release = on_release
+        self._settings = settings_provider
         self._states: dict[ServerConnection, ConnectionState] = {}
         self._server: Any = None
 
@@ -283,6 +285,7 @@ class PairingServer:
     ) -> None:
         async for raw in connection:
             state.frames_seen += 1
+            message: dict[str, Any] | None = None
             try:
                 message = p.decode(raw)
                 await self._handle_event(state, message)
@@ -292,6 +295,15 @@ class PairingServer:
                 # kill a live session mid-lecture.
                 if exc.code not in (p.E_RATE_LIMITED, p.E_UNSAFE, p.E_BAD_FIELD):
                     log.info("dropping frame: %s", exc.code)
+
+                # A refused `set` is the one silent drop that is actively
+                # misleading. The phone has already moved its slider to the
+                # value it asked for, so dropping the frame leaves it showing
+                # a setting the computer is not using, with no way to tell that
+                # apart from one that worked. Answering with what is actually
+                # in force both refuses the change and re-syncs the screen.
+                if message is not None and message.get("t") == "set":
+                    await self._send_nowait(self._settings_message())
 
     async def _handle_event(
         self, state: ConnectionState, message: dict[str, Any]
@@ -388,6 +400,30 @@ class PairingServer:
                 "serverTime": int(time.time() * 1000),
             }
         )
+        await self._send_nowait(self._settings_message())
+
+    def _settings_message(self) -> dict[str, Any]:
+        """The companion's real settings, or a documented neutral default.
+
+        A default rather than an omission, so a phone that has just connected
+        has something to draw. It is deliberately the same values the simulator
+        starts with - a phone showing "1.0 / 1.6" because the companion had
+        nothing to say would look like a working app reporting a wrong value.
+        """
+        if self._settings is not None:
+            return {"t": "settings", **self._settings()}
+        return {"t": "settings", "cursorSpeed": 1.0, "accel": 1.6, "safeMode": False}
+
+    def broadcast(self, message: dict[str, Any]) -> None:
+        """Send to every authenticated phone, from synchronous code.
+
+        `on_event` is called from the backend loop but is not itself a
+        coroutine, so it cannot await. Scheduling onto the running loop keeps
+        the ordering guarantee that matters - the reply to a `set` reaches the
+        phone that asked, rather than racing the next event it sends.
+        """
+        with contextlib.suppress(RuntimeError):
+            asyncio.get_running_loop().create_task(self._send_nowait(message))
 
     async def _send_nowait(self, message: dict[str, Any]) -> None:
         """Send to every authenticated socket."""

@@ -102,6 +102,14 @@ KEY_IDS: Final = (
 )
 
 MOUSE_BUTTONS: Final = frozenset({"left", "right", "middle"})
+
+#: Ranges the companion accepts for a `set`, and clamps to rather than
+#: rejecting. A phone asking for a cursor speed of 400 gets 4.0 and is told so;
+#: refusing outright would leave the user with a slider that does nothing and
+#: no explanation. The lower bound is well under 1 so "slower than normal" is
+#: actually reachable, which presenters driving a large screen need.
+CURSOR_SPEED_RANGE: Final = (0.25, 4.0)
+ACCEL_RANGE: Final = (1.0, 3.0)
 CLICK_ACTIONS: Final = frozenset({"down", "up", "click", "double"})
 KEY_ACTIONS: Final = frozenset({"press", "release", "tap"})
 SLIDE_ACTIONS: Final = frozenset({"next", "prev", "start", "end", "blank"})
@@ -220,6 +228,25 @@ def _require_enum(
     return value
 
 
+def _optional_range(
+    message: dict[str, Any], field: str, limits: tuple[float, float]
+) -> float | None:
+    """Read an optional numeric field, checking it is inside `limits`.
+
+    Returns None when the field is absent, which is not an error and not zero:
+    `set` is a partial update, so a phone changing only Safe Mode sends only
+    Safe Mode. Defaulting an absent field to 0 would silently reset a setting
+    the user never touched.
+    """
+    if field not in message:
+        return None
+    value = _require_number(message, field)
+    low, high = limits
+    if not low <= value <= high:
+        raise ProtocolError(E_BAD_FIELD, f"{field}={value} outside {low}-{high}")
+    return value
+
+
 def is_blocked(chord: list[str]) -> bool:
     """Whether Safe Mode refuses this chord, in either order."""
     normalised = tuple(sorted(chord))
@@ -294,6 +321,29 @@ def validate(message: dict[str, Any]) -> None:
 
     if kind == "ping":
         _require_int(message, "ts")
+        return
+
+    if kind == "set":
+        # A partial update: only the fields present are changed. Validating the
+        # range here rather than trusting the phone means a phone claiming a
+        # cursor speed of 400 cannot make the pointer unusable, and the value
+        # that gets applied is echoed back so the screen can show the truth.
+        present = False
+        if _optional_range(message, "cursorSpeed", CURSOR_SPEED_RANGE) is not None:
+            present = True
+        if _optional_range(message, "accel", ACCEL_RANGE) is not None:
+            present = True
+        if "safeMode" in message:
+            if not isinstance(message["safeMode"], bool):
+                raise ProtocolError(E_BAD_FIELD, "safeMode must be a boolean")
+            present = True
+        if not present:
+            raise ProtocolError(E_BAD_FIELD, "set carried no settings")
+        return
+
+    if kind == "forget":
+        # No fields. This phone is asking to be unpaired, which the companion
+        # treats exactly like the Revoke button in its window.
         return
 
     # Unknown type: counted and dropped, not an error.

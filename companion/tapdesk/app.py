@@ -189,6 +189,9 @@ class Companion:
             # A phone that vanishes mid-drag must not leave the desktop with
             # Ctrl down. This is the only thing that lets go of it.
             on_release=self._simulator.release_all,
+            # So the phone can be shown the settings that are actually in
+            # force, rather than the ones it last asked for.
+            settings_provider=self.current_settings,
         )
 
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -210,18 +213,82 @@ class Companion:
     # -- input -------------------------------------------------------------
 
     def _on_event(self, state: Any, message: dict[str, Any]) -> None:
-        """Apply a validated event. Runs on the backend loop.
+        """Apply a validated event. Runs on the backend loop."""
+        kind = message["t"]
 
-        Safe Mode is enforced here rather than in the window so that no UI
-        path can forget to check it. While it is on, only releases get
-        through: the phone can let go of things but cannot press anything.
-        That asymmetry is deliberate - you need to be able to stop a runaway
-        input, not have it stopped for you.
-        """
-        if self._safe_mode and not _is_release(message):
-            log.debug("safe mode dropped %s", message.get("t"))
+        if kind == "set":
+            self._apply_settings(state, message)
             return
+
+        if kind == "forget":
+            # The phone asking to be unpaired from its own pocket, without
+            # anyone walking to this computer. Exactly equivalent to clicking
+            # Revoke in the window, including the reply the phone expects.
+            self._forget_device(state)
+            return
+
+        # Safe Mode is enforced here rather than in the window so that no UI
+        # path can forget to check it. While it is on, only releases get
+        # through: the phone can let go of things but cannot press anything.
+        # That asymmetry is deliberate - you need to be able to stop a runaway
+        # input, not have it stopped for you.
+        if self._safe_mode and not _is_release(message):
+            log.debug("safe mode dropped %s", kind)
+            return
+
         self._simulator.handle(message)
+
+    # -- settings ----------------------------------------------------------
+
+    def current_settings(self) -> dict[str, Any]:
+        """What the companion is actually using, right now.
+
+        Sent to the phone on connect and after every change. The point is that
+        the phone's slider shows what the computer is doing rather than what the
+        phone last asked for. If those ever disagree, only one can be the
+        truth, and the user cannot tell which from the phone alone.
+        """
+        return {
+            "cursorSpeed": round(self._simulator.cursor_speed, 3),
+            "accel": round(self._simulator.curve, 3),
+            "safeMode": self._safe_mode,
+        }
+
+    def _apply_settings(self, state: Any, message: dict[str, Any]) -> None:
+        """Apply a partial `set`, clamped, then tell the phone what stuck."""
+        low_speed, high_speed = p.CURSOR_SPEED_RANGE
+        low_accel, high_accel = p.ACCEL_RANGE
+
+        if "cursorSpeed" in message:
+            self._simulator.cursor_speed = min(
+                high_speed, max(low_speed, float(message["cursorSpeed"]))
+            )
+        if "accel" in message:
+            self._simulator.curve = min(
+                high_accel, max(low_accel, float(message["accel"]))
+            )
+        if "safeMode" in message:
+            self._safe_mode = bool(message["safeMode"])
+            # Turning it on must let go of anything the phone still holds.
+            # Freezing input while a key stays held is the exact situation Safe
+            # Mode exists to end.
+            if self._safe_mode:
+                self._simulator.release_all()
+
+        log.info("settings now %s", self.current_settings())
+        self._server.broadcast({"t": "settings", **self.current_settings()})
+        self._bridge.call(self._refresh_window)
+
+    def _forget_device(self, state: Any) -> None:
+        device_id = getattr(state, "device_id", None)
+        if device_id:
+            self._devices.revoke(device_id)
+            log.info("phone asked to be unpaired: %s", device_id)
+        # Nothing the phone held may stay held once it has thrown its access
+        # away.
+        self._simulator.release_all()
+        self._server.broadcast({"t": "revoked"})
+        self._bridge.call(self._refresh_window)
 
     async def _ask_approval(self, device_name: str, peer: str) -> bool:
         """Ask the user whether to allow this phone.

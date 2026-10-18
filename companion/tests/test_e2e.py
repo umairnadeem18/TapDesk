@@ -616,3 +616,296 @@ class TestFullHandshake:
             if ws is not None:
                 await ws.close()
             companion.stop_backend()
+
+async def _greeting(ws) -> dict[str, Any]:
+    """Drain auth_ok, welcome and settings, returning the settings push.
+
+    The companion tells the phone what it is doing the moment it connects. A
+    test that reads a fixed number of messages instead is really asserting
+    "nothing else was added", which is how adding the settings push - the
+    right thing - showed up as a ping test failing.
+    """
+    seen: dict[str, Any] = {}
+    while "settings" not in seen:
+        message = p.decode(await asyncio.wait_for(ws.recv(), 5))
+        seen[message["t"]] = message
+    return seen["settings"]
+
+
+class TestSettingsReachTheComputer:
+    """A slider on the phone has to move the pointer on the PC.
+
+    The settings are applied in the companion's input layer, not on the phone,
+    so the only way to know a change took effect is to watch the real thing it
+    changes. Asserting that the phone sent a `set` would prove the phone
+    worked, not that the setting did.
+    """
+
+    async def test_the_phone_is_told_the_settings_the_second_it_connects(
+        self, tmp_path: Path
+    ) -> None:
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, reply = await _handshake(companion, port)
+            assert reply["t"] == "auth_ok", reply
+
+            settings = await _greeting(ws)
+            assert settings["cursorSpeed"] == 1.0
+            assert settings["accel"] == 1.6
+            assert settings["safeMode"] is False
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_cursor_speed_reaches_the_input_layer(self, tmp_path: Path) -> None:
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "set", "cursorSpeed": 2.5}))
+            settings = await _greeting(ws)
+
+            # Echoed back, so the phone can show the truth rather than its
+            # own optimism.
+            assert settings["cursorSpeed"] == 2.5
+            assert companion._simulator.cursor_speed == 2.5
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_a_slower_pointer_is_actually_reachable(
+        self, tmp_path: Path
+    ) -> None:
+        """Below 1.0 is the case that matters and the easiest one to lose.
+
+        Someone driving a projector from the back of a room needs the pointer
+        to crawl. If the range were 1.0-4.0 the slider would look right and
+        the bottom half of its travel would do nothing at all.
+        """
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "set", "cursorSpeed": 0.25}))
+            settings = await _greeting(ws)
+
+            assert settings["cursorSpeed"] == 0.25
+            assert companion._simulator.cursor_speed == 0.25
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_the_acceleration_curve_reaches_the_input_layer(
+        self, tmp_path: Path
+    ) -> None:
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "set", "accel": 2.4}))
+            settings = await _greeting(ws)
+
+            assert settings["accel"] == 2.4
+            assert companion._simulator.curve == 2.4
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_changing_one_setting_leaves_the_others_alone(
+        self, tmp_path: Path
+    ) -> None:
+        """`set` is a partial update, and it has to behave like one.
+
+        A phone that always sent all three fields would reset a Safe Mode
+        change made on the computer every time it connected - two people
+        editing one setting, last write wins, nobody told.
+        """
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "set", "cursorSpeed": 3.0}))
+            await _greeting(ws)
+            await ws.send(p.encode({"t": "set", "accel": 2.0}))
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "set", "safeMode": True}))
+            settings = await _greeting(ws)
+
+            assert settings["safeMode"] is True
+            assert settings["cursorSpeed"] == 3.0
+            assert settings["accel"] == 2.0
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_an_impossible_speed_is_refused_and_the_old_one_survives(
+        self, tmp_path: Path
+    ) -> None:
+        """A refused change must snap the phone back, not leave it lying.
+
+        If the frame were merely dropped the slider would sit at 99 while the
+        pointer behaved exactly as before, and the user would have no way to
+        tell that from a setting that worked.
+        """
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "set", "cursorSpeed": 99.0}))
+            settings = await _greeting(ws)
+
+            assert settings["cursorSpeed"] == 1.0, settings
+            assert companion._simulator.cursor_speed == 1.0
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_turning_on_safe_mode_over_the_wire_lets_go_of_a_held_key(
+        self, tmp_path: Path
+    ) -> None:
+        """Freezing input while Ctrl is still down is the thing to avoid.
+
+        Safe Mode's purpose is to stop a runaway; leaving the desktop with a
+        modifier held would make turning it on part of the runaway.
+        """
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        performed: list[tuple] = []
+        try:
+            companion._simulator._execute = performed.append
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "key", "k": "ctrl", "a": "press"}))
+            await asyncio.sleep(0.4)
+            assert companion._simulator.held.keys, "Ctrl should be down first"
+
+            await ws.send(p.encode({"t": "set", "safeMode": True}))
+            await _greeting(ws)
+
+            assert companion._simulator.held.keys == set()
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_safe_mode_still_blocks_input_after_a_phone_sets_it(
+        self, tmp_path: Path
+    ) -> None:
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        performed: list[tuple] = []
+        try:
+            companion._simulator._execute = performed.append
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "set", "safeMode": True}))
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "text", "s": "rm -rf"}))
+            await asyncio.sleep(0.4)
+            assert ("text", "rm -rf") not in performed, performed
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+
+class TestUnpairingFromThePhone:
+    """A phone should be able to cut its own access without walking over."""
+
+    async def test_a_phone_can_ask_to_be_unpaired_and_then_cannot_reconnect(
+        self, tmp_path: Path
+    ) -> None:
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, reply = await _handshake(companion, port)
+            assert reply["t"] == "auth_ok", reply
+            await _greeting(ws)
+            key = reply["deviceKey"]
+            assert len(companion._devices) == 1
+
+            await ws.send(p.encode({"t": "forget"}))
+            answer = p.decode(await asyncio.wait_for(ws.recv(), 5))
+            assert answer["t"] == "revoked", answer
+
+            await ws.close()
+            await asyncio.sleep(0.3)
+
+            # The key is destroyed, not just politely ignored. Reconnecting
+            # with the key the phone still has must fail the way a revoked
+            # device always has.
+            ws2, again = await _handshake(companion, port, key=key)
+            try:
+                assert again["t"] == "auth_err", again
+                assert again["code"] == "E_REVOKED", again
+            finally:
+                await ws2.close()
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()
+
+    async def test_unpairing_lets_go_of_everything_the_phone_was_holding(
+        self, tmp_path: Path
+    ) -> None:
+        """Access gone means input gone, not input frozen mid-gesture."""
+        port = free_port()
+        companion = make_companion(tmp_path, port=port, approve=lambda n, p: True)
+        ws = None
+        try:
+            companion.start_backend()
+            ws, _ = await _handshake(companion, port)
+            await _greeting(ws)
+
+            await ws.send(p.encode({"t": "key", "k": "ctrl", "a": "press"}))
+            await asyncio.sleep(0.4)
+            assert companion._simulator.held.keys
+
+            await ws.send(p.encode({"t": "forget"}))
+            await asyncio.wait_for(ws.recv(), 5)
+            await asyncio.sleep(0.3)
+
+            assert companion._simulator.held.keys == set()
+        finally:
+            if ws is not None:
+                await ws.close()
+            companion.stop_backend()

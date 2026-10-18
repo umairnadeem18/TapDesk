@@ -382,8 +382,13 @@ class TestEvents:
                 )
                 await ws.recv()
                 await ws.send(p.encode({"t": "auth", "key": key}))
-                await ws.recv()
-                await ws.recv()
+                # The greeting after auth is auth_ok, welcome, then settings -
+                # the phone must not have to send a `set` before it knows what
+                # the computer is actually doing, or its sliders would show
+                # guesses for the whole of a session.
+                assert p.decode(await ws.recv())["t"] == "auth_ok"
+                assert p.decode(await ws.recv())["t"] == "welcome"
+                assert p.decode(await ws.recv())["t"] == "settings"
                 await ws.send(p.encode({"t": "ping", "ts": 1763308800123}))
                 pong = p.decode(await ws.recv())
                 assert pong["t"] == "pong"

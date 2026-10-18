@@ -327,7 +327,40 @@ Companion-side mapping (the phone sends only the action, never a key):
 | `end` | `esc` |
 | `blank` | `b` |
 
-### 4.5 Companion → phone
+### 4.5 Phone → companion: configuration
+
+Two messages that change what the companion does, rather than what it types.
+They exist because a setting the user can only change on the PC is a setting
+half the product cannot reach — the phone is the thing in their hand.
+
+| Message | Fields | Notes |
+|---|---|---|
+| `set` | `cursorSpeed` float, `accel` float, `safeMode` bool | **all fields optional**; only the ones present are changed |
+| `forget` | — | this phone asks to be unpaired; the companion revokes this device and answers `revoked` |
+
+`set` is a partial update by design. A settings screen that always sends all
+three fields would overwrite a Safe Mode change made on the PC the moment the
+phone reconnected — two people editing one setting, last write wins, with
+nobody informed. The companion answers every `set` with a `settings` push so
+both sides converge on the truth rather than assuming their own value stuck.
+
+Ranges are enforced on the companion, which clamps and echoes back what it
+actually applied. A phone showing "2.0" while the computer is using 5.0 would
+be a lie the user cannot detect.
+
+| Field | Range | Meaning |
+|---|---|---|
+| `cursorSpeed` | 0.25 – 4.0 | multiplier on the §4.2 max speed |
+| `accel` | 1.0 – 3.0 | exponent; >1 is fine control near centre |
+| `safeMode` | bool | blocks risky chords, answering `E_UNSAFE` |
+
+`forget` exists so a phone can be unpaired **without walking to the computer**.
+A teacher who lends their phone to a colleague should be able to cut access
+from their own pocket. The companion treats it exactly as if the Revoke button
+had been clicked in its window: the device key is destroyed, the device answers
+`revoked`, and the phone deletes its stored key.
+
+### 4.6 Companion → phone
 
 | Message | Fields | Notes |
 |---|---|---|
@@ -335,8 +368,8 @@ Companion-side mapping (the phone sends only the action, never a key):
 | `welcome` | `maxText`, `stickHz`, `serverTime` | once, after `auth_ok` |
 | `pong` | `ts`, `st` | latency probe |
 | `shutdown` | `reason` | companion is exiting |
-| `revoked` | — | this device was revoked; phone must forget the key |
-| `settings` | `cursorSpeed` int, `accel` float, `safeMode` bool | pushed when the PC-side settings change |
+| `revoked` | — | this device was revoked, or `forget` was sent; phone must forget the key |
+| `settings` | `cursorSpeed` float, `accel` float, `safeMode` bool | sent after `auth_ok`, after every `set`, and whenever a setting changes on the PC |
 
 ---
 
