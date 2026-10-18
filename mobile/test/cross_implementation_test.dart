@@ -461,6 +461,16 @@ test('a phone that scans a code gets nothing without approval', () async {
     expect(welcome['maxText'], isA<int>());
     expect(welcome['stickHz'], isA<int>());
 
+    // The companion tells the phone what it is doing the moment it connects,
+    // so the greeting is not finished yet. This one is read explicitly rather
+    // than being allowed to turn up later and be mistaken for a complaint -
+    // which is exactly what happened when it was added.
+    final settings = await frames.next();
+    expect(settings['t'], 'settings');
+    expect(settings['cursorSpeed'], isA<num>());
+    expect(settings['accel'], isA<num>());
+    expect(settings['safeMode'], isA<bool>());
+
     // Every frame the tabs really produce, encoded exactly as the app encodes
     // them, decoded and validated by a different implementation.
     //
@@ -481,13 +491,25 @@ test('a phone that scans a code gets nothing without approval', () async {
       KeyEvent('ctrl', 'press'),
       ComboEvent(['ctrl', 'shift', 'p']),
       StickEvent(0.5, -0.5),
+      // The settings screen's own frame. A partial `set` is what the app sends
+      // when only one slider moved, so the companion has to accept exactly
+      // that shape as well as a full one.
+      const SetEvent(cursorSpeed: 1.75),
     ]) {
       socket.send(event.encode());
       await Future<void>.delayed(const Duration(milliseconds: 90));
     }
 
-    // Nothing may come back. The wait is real rather than instantaneous, so a
-    // slow complaint is still caught.
+    // One reply is expected: the companion echoes what it actually applied
+    // after a `set`. It is read and checked rather than skipped, because an
+    // echo the phone cannot read is the same failure as no echo at all.
+    final reply = await frames.nextOrNull(const Duration(milliseconds: 2000));
+    expect(reply?['t'], 'settings',
+        reason: 'the companion must answer a set with the settings it applied');
+    expect(reply?['cursorSpeed'], 1.75);
+
+    // Nothing else may come back. The wait is real rather than
+    // instantaneous, so a slow complaint is still caught.
     final complaint = await frames.nextOrNull(const Duration(milliseconds: 1500));
 
     expect(socket.isOpen, isTrue);
@@ -498,7 +520,9 @@ test('a phone that scans a code gets nothing without approval', () async {
     );
 
     await socket.close();
-  });  test('an unknown field does not break the handshake', () async {
+  });
+
+  test('an unknown field does not break the handshake', () async {
     // The protocol is additive. If the companion rejected unknown fields, every
     // future PC would break every phone already in a user's pocket.
     final link = await _printLink(defaultPort);

@@ -6,11 +6,14 @@ import '../state/connection_controller.dart';
 import '../transport/event_sink.dart';
 import '../screens/keyboard_tab.dart';
 import '../screens/mouse_tab.dart';
+import '../screens/settings_screen.dart';
 import '../screens/slides_tab.dart';
 import '../state/pairing_store.dart';
 import '../state/preview_mode.dart';
+import '../state/settings.dart';
 import '../theme/tokens.dart';
 import 'connection_indicators.dart';
+import 'haptics.dart';
 
 /// The app shell: app bar, connection banner, three tabs.
 ///
@@ -58,7 +61,13 @@ class _AppShellState extends State<AppShell> {
     // Wake lock while connected: a sleeping screen drops the session, and a
     // presenter who has to unlock the phone to advance a slide has discovered
     // the product's core job is inconvenient.
-    final connected = sink.isReady || widget.preview;
+    //
+    // The user's choice in Settings as well as the connection: somebody using
+    // the phone at a desk may well want it to time out like anything else, and
+    // an app that overrides the system setting on their behalf is the kind of
+    // thing that ends up reported as a battery complaint.
+    final settings = context.watch<AppSettings>();
+    final connected = (sink.isReady || widget.preview) && settings.keepAwake;
 
     return _KeepScreenAwake(
       enabled: connected,
@@ -99,7 +108,7 @@ class _AppShellState extends State<AppShell> {
                     // tabs untouched - stale controls the user cannot use, with
                     // no indication why.
                     SlidesTab(),
-                    MouseTab(),
+                    MouseTab(leftHanded: settings.leftHanded),
                     KeyboardTab(),
                   ],
                 ),
@@ -418,55 +427,6 @@ class _TabButton extends StatelessWidget {
               style: TapDeskText.button.copyWith(color: fg),
               child: Text(label),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Settings entry point. Phase 3.5 fills in the controls.
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: TapDeskColors.background,
-      appBar: AppBar(
-        backgroundColor: TapDeskColors.background,
-        systemOverlayStyle: TapDeskTheme.systemOverlay,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          color: TapDeskColors.textMuted,
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: const Text('Settings', style: TapDeskText.button),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(TapDeskSpace.s5),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.tune,
-                size: 40,
-                color: TapDeskColors.divider,
-              ),
-              const SizedBox(height: TapDeskSpace.s4),
-              Text(
-                'Settings arrive in Phase 3.5',
-                style: TapDeskText.bodyText,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: TapDeskSpace.s2),
-              Text(
-                'Cursor speed, haptics, left-handed layout, paired devices.',
-                style: TapDeskText.label,
-                textAlign: TextAlign.center,
-              ),
-            ],
           ),
         ),
       ),

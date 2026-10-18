@@ -235,6 +235,45 @@ class PingEvent extends TapDeskEvent {
   Map<String, dynamic> toJson() => {'t': type, 'ts': timestampMs};
 }
 
+/// Change how the computer behaves. Section 4.5.
+///
+/// Absent fields are absent from the frame, not sent as null or omitted from
+/// the default: a `set` carrying only Safe Mode must not also carry the cursor
+/// speed the phone happened to have, or it would undo the change being made.
+class SetEvent extends TapDeskEvent {
+  const SetEvent({this.cursorSpeed, this.accel, this.safeMode});
+
+  final double? cursorSpeed;
+  final double? accel;
+  final bool? safeMode;
+
+  @override
+  String get type => 'set';
+
+  @override
+  Map<String, dynamic> toJson() => {
+        't': type,
+        if (cursorSpeed != null) 'cursorSpeed': cursorSpeed,
+        if (accel != null) 'accel': accel,
+        if (safeMode != null) 'safeMode': safeMode,
+      };
+}
+
+/// Ask the computer to unpair this phone. Section 4.5.
+///
+/// Exists so someone who lends their phone can cut access from their own
+/// pocket instead of walking to the computer. The companion treats it exactly
+/// as the Revoke button in its window, and answers `revoked`.
+class ForgetEvent extends TapDeskEvent {
+  const ForgetEvent();
+
+  @override
+  String get type => 'forget';
+
+  @override
+  Map<String, dynamic> toJson() => {'t': type};
+}
+
 /// Slide actions, named so a typo is a compile error rather than a silently
 /// dropped message.
 class SlideAction {

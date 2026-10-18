@@ -7,6 +7,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'state/connection_controller.dart';
 import 'state/pairing_store.dart';
 import 'state/preview_mode.dart';
+import 'state/settings.dart';
+import 'state/shared_prefs_storage.dart';
 import 'theme/tokens.dart';
 import 'transport/event_sink.dart';
 import 'transport/key_store.dart';
@@ -15,6 +17,7 @@ import 'transport/pairing_payload.dart';
 import 'transport/session.dart';
 import 'transport/socket.dart';
 import 'ui/app_shell.dart';
+import 'ui/haptics.dart';
 import 'screens/pairing_screen.dart';
 
 void main() {
@@ -43,12 +46,14 @@ class TapDeskApp extends StatefulWidget {
 class _TapDeskAppState extends State<TapDeskApp> {
   late final ConnectionController _controller;
   late final EventSink _sink;
+  late final AppSettings _settings;
   final ValueNotifier<String?> _error = ValueNotifier<String?>(null);
 
   @override
   void initState() {
     super.initState();
     _controller = ConnectionController();
+    _settings = AppSettings(storage: SharedPrefsSettingsStorage())..load();
 
     // An injected sink wins, which is what keeps the widget tests free of a
     // network and a Keystore. Only the real app builds a live session.
@@ -58,12 +63,33 @@ class _TapDeskAppState extends State<TapDeskApp> {
           keyStore: SecureKeyStore(),
           factory: const PinnedSocketFactory(),
         );
+
+    // Attached here rather than inside the settings screen, because the screen
+    // is opened from the app bar and can be reopened and rebuilt at will.
+    // Wiring the connection up where the screen is constructed would mean the
+    // settings only worked the first time they were opened.
+    if (_sink is LiveEventSink) {
+      (_sink as LiveEventSink).attachSettings(_settings);
+    }
+
+    // Haptics is the one setting with a consumer that is not a widget. Keeping
+    // the static in step here, rather than at each call site, is what the
+    // design system asks for: "haptics off" has to mean off everywhere, not
+    // off on the screen where it was switched.
+    _settings.addListener(_applyHapticsPreference);
+    _applyHapticsPreference();
+  }
+
+  void _applyHapticsPreference() {
+    Haptics.enabled = _settings.haptics;
   }
 
   @override
   void dispose() {
     final sink = _sink;
     if (sink is LiveEventSink) sink.dispose();
+    _settings.removeListener(_applyHapticsPreference);
+    _settings.dispose();
     _controller.dispose();
     _error.dispose();
     super.dispose();
@@ -85,6 +111,7 @@ class _TapDeskAppState extends State<TapDeskApp> {
         // has to be told when that changes - otherwise Mouse and Keyboard stay
         // dead for the whole session.
         ChangeNotifierProvider<EventSink>.value(value: _sink),
+        ChangeNotifierProvider<AppSettings>.value(value: _settings),
         ValueListenableProvider<String?>.value(value: _error),
       ],
       child: MaterialApp(

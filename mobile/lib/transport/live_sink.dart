@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../state/connection_controller.dart';
+import '../state/settings.dart';
 import 'event_sink.dart';
 import 'key_store.dart';
 import 'pairing_payload.dart';
@@ -45,6 +46,13 @@ class LiveEventSink extends EventSink {
 
   TapDeskSession? _session;
   PairingPayload? _payload;
+
+  /// Told when the computer reports its settings, and when the phone wants to
+  /// change them or unpair itself.
+  ///
+  /// Attached by whoever owns the settings screen, and left null when nothing
+  /// is listening so the app runs in preview mode with no settings at all.
+  AppSettings? settings;
 
   /// The PC the user is currently driving, if any.
   PairingPayload? get payload => _payload;
@@ -98,6 +106,10 @@ class LiveEventSink extends EventSink {
       fingerprint: payload.fingerprint,
     );
 
+    // The computer's settings belong to a specific connection. A report from
+    // the one being replaced must not be mistaken for the new one's.
+    session.onRemoteSettings = (message) => settings?.applyRemote(message);
+
     try {
       await session.connect(token: effectiveToken, deviceKey: store.deviceKey());
     } catch (error) {
@@ -137,6 +149,29 @@ class LiveEventSink extends EventSink {
   Future<void> disconnect() async {
     await _session?.disconnect();
     _session = null;
+    // The sliders must not keep showing a computer we are no longer driving.
+    // Someone who disconnects and then scans a different PC would otherwise see
+    // the first one's cursor speed and have no way to tell.
+    settings?.clearRemote();
+  }
+
+  /// Let the settings screen reach this connection.
+  ///
+  /// Done here rather than in the screen so the wiring exists in exactly one
+  /// place. A settings screen that silently does nothing when the transport
+  /// forgets to call this looks identical to one that is not listening.
+  void attachSettings(AppSettings value) {
+    settings = value;
+    value.onChange = (change) {
+      send(
+        SetEvent(
+          cursorSpeed: change.cursorSpeed,
+          accel: change.accel,
+          safeMode: change.safeMode,
+        ),
+      );
+    };
+    value.onForget = () => send(const ForgetEvent());
   }
 
   @override

@@ -54,6 +54,14 @@ class TapDeskSession extends EventSink {
   int _sentCount = 0;
   bool _disposed = false;
 
+  /// Told what the computer says it is doing, as a `settings` frame.
+  ///
+  /// Set by the sink, which forwards it to the settings screen. A session does
+  /// not know or care whether a settings screen exists, and the alternative -
+  /// reaching into the notifier from here - would couple the transport to a
+  /// screen it has no business knowing about.
+  void Function(Map<Object?, Object?> message)? onRemoteSettings;
+
   ConnectionStatus get status => _machine.status;
 
   @override
@@ -153,6 +161,9 @@ class TapDeskSession extends EventSink {
         for (final frame in frames) {
           _socket?.send(frame);
         }
+
+      case ReportSettings(:final message):
+        onRemoteSettings?.call(message);
 
       case Ignore():
         break;

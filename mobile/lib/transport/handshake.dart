@@ -41,6 +41,17 @@ class SendFrames extends HandshakeOutcome {
   final List<String> frames;
 }
 
+/// The computer reported the settings it is actually using.
+///
+/// Its own outcome rather than something the session digs out of the raw frame,
+/// so that "ignore what we do not understand" stays a single decision in one
+/// switch instead of a filter in every caller.
+class ReportSettings extends HandshakeOutcome {
+  const ReportSettings(this.message);
+
+  final Map<Object?, Object?> message;
+}
+
 /// The message was not understood here. Deliberately not fatal: once connected
 /// the server may add event types, and an old phone should ignore them rather
 /// than drop the user's session.
@@ -207,6 +218,12 @@ class HandshakeMachine {
       case 'disconnect':
         _status = ConnectionStatus.reconnecting;
         return const AdvanceTo(ConnectionStatus.reconnecting);
+
+      case 'settings':
+        // Not a status change, so it deliberately does not move the machine.
+        // The settings screen has to learn what the computer is doing without
+        // the connection being affected by it.
+        return ReportSettings(message);
 
       default:
         return const Ignore();
