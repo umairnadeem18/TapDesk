@@ -312,11 +312,19 @@ class PairingServer:
 
         if kind == "stick":
             # No rate limit here, and deliberately so: the newest value always
-            # wins and older ones are discarded. That IS the coalescing the
-            # protocol asks for - a frame limiter would drop the newest value
-            # instead of the oldest and make the cursor stutter.
+            # wins and older ones are discarded.
+            #
+            # The forwarding is what actually matters. This used to store the
+            # value on the ConnectionState and return, so the input layer was
+            # never told which way the stick was pointing - every other event
+            # type reached it and the cursor sat still no matter how hard the
+            # phone was dragged. The coalescing the comment above describes
+            # happens anyway inside the simulator, which keeps only the latest
+            # value; a frame limiter here would drop the newest one instead of
+            # the oldest and make the cursor stutter.
             state.stick = (float(message["x"]), float(message["y"]))
             state.stick_updated = time.monotonic()
+            self._on_event(state, message)
             return
 
         if kind == "move":
@@ -324,6 +332,7 @@ class PairingServer:
                 state.pending_move[0] + int(message["dx"]),
                 state.pending_move[1] + int(message["dy"]),
             )
+            self._on_event(state, message)
             return
 
         if kind == "text":

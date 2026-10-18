@@ -438,6 +438,120 @@ class TestFullHandshake:
         finally:
             companion.stop_backend()
 
+    async def test_the_stick_actually_reaches_the_input_layer(
+        self, tmp_path: Path
+    ) -> None:
+        """The cursor must move, not merely the frame be accepted.
+
+        This is the one test that would have caught the analog stick being
+        dead. The server used to store stick values on the connection state and
+        return without forwarding them, so every other event type worked, the
+        phone was convinced it was sending, the frames passed validation -
+        and the cursor never moved.
+
+        Asserting "the companion did not complain" was not enough. A frame can
+        be perfectly valid, correctly framed and correctly authenticated and
+        still never be acted on.
+        """
+        port = free_port()
+        companion = make_companion(
+            tmp_path,
+            port=port,
+            approve=lambda name, peer: True,
+        )
+
+        performed: list[tuple] = []
+        companion._simulator._execute = performed.append
+
+        try:
+            companion.start_backend()
+            ws, reply = await _handshake(companion, port)
+            assert reply["t"] == "auth_ok", reply
+
+            await ws.send(p.encode({"t": "stick", "x": 1.0, "y": 0.0}))
+            # The stick is sampled on a 60 Hz timer, not per frame, so give the
+            # backend loop a few ticks to turn the value into a mouse movement.
+            await asyncio.sleep(0.4)
+
+            moves = [a for a in performed if a[0] == "move"]
+            assert moves, (
+                "the stick was accepted but never moved the cursor; "
+                f"actions were {performed}"
+            )
+            assert moves[0][1] > 0, "dragging right must move the cursor right"
+
+            await ws.close()
+        finally:
+            companion.stop_backend()
+
+    async def test_moving_up_moves_the_cursor_up(self, tmp_path: Path) -> None:
+        # +y is up on the wire and screen coordinates count downward. Missing
+        # that negation sends the cursor the wrong way, which feels like a
+        # broken stick rather than an inverted one.
+        port = free_port()
+        companion = make_companion(
+            tmp_path, port=port, approve=lambda name, peer: True
+        )
+
+        performed: list[tuple] = []
+        companion._simulator._execute = performed.append
+
+        try:
+            companion.start_backend()
+            ws, reply = await _handshake(companion, port)
+            assert reply["t"] == "auth_ok", reply
+
+            await ws.send(p.encode({"t": "stick", "x": 0.0, "y": 1.0}))
+            await asyncio.sleep(0.4)
+
+            moves = [a for a in performed if a[0] == "move"]
+            assert moves
+            assert moves[0][2] < 0, "up on the wire must be up on the screen"
+
+            await ws.close()
+        finally:
+            companion.stop_backend()
+
+    async def test_releasing_the_stick_stops_the_cursor(self, tmp_path: Path) -> None:
+        """A stick left deflected must not slide the cursor forever.
+
+        The phone sends a zero on release; without it, or without the stick
+        going stale, a phone set down mid-drag would keep driving the pointer
+        across the presenter's desktop with nobody touching it.
+        """
+        port = free_port()
+        companion = make_companion(
+            tmp_path, port=port, approve=lambda name, peer: True
+        )
+
+        performed: list[tuple] = []
+        companion._simulator._execute = performed.append
+
+        try:
+            companion.start_backend()
+            ws, reply = await _handshake(companion, port)
+            assert reply["t"] == "auth_ok", reply
+
+            await ws.send(p.encode({"t": "stick", "x": 1.0, "y": 0.0}))
+            await asyncio.sleep(0.3)
+
+            await ws.send(p.encode({"t": "stick", "x": 0.0, "y": 0.0}))
+            # Let the release actually be processed before starting to watch.
+            # The tick loop samples whatever value it last received, so a tick
+            # fired in the instant between "release sent" and "release applied"
+            # would otherwise be counted as the cursor still moving.
+            await asyncio.sleep(0.2)
+            performed.clear()
+
+            await asyncio.sleep(0.3)
+
+            moves = [a for a in performed if a[0] == "move"]
+            assert not moves, f"the cursor kept moving after release: {moves}"
+
+            await ws.close()
+        finally:
+            companion.stop_backend()
+
     async def test_disconnect_releases_held_input(self, tmp_path: Path) -> None:
         # Section 7.10: a phone that vanishes mid-drag must not leave the
         # desktop with the mouse button down.
