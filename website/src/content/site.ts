@@ -54,7 +54,7 @@ export const RELEASES = {
     minWindows: "Windows 10 / 11 (64-bit)",
     // SHA-256 of TapDesk-1.0.0-setup.exe
     sha256:
-      "17c6c1fdf6babfaef25c469c29ff98e241a82bdc6fa1f8740dc96cabffdb48ca",
+      "913ad2eca46fe13d1ba200442d76b3fa8989e847ed8c582fd16d41cc25a07631",
     url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.2/TapDesk-1.0.0-setup.exe",
   },
 };

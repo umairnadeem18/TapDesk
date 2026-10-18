@@ -30,6 +30,7 @@ import asyncio
 import logging
 import sys
 import threading
+import traceback
 from pathlib import Path
 from typing import Any, Callable
 
@@ -65,6 +66,60 @@ def _is_release(message: dict[str, Any]) -> bool:
     if kind == "click":
         return message.get("a") == "up"
     return False
+
+
+#: Winsock error numbers, named so the meaning travels with the number.
+_WSAEADDRINUSE = 10048
+_WSAEACCES = 10013
+
+#: The same two conditions on other platforms. Not theoretical: the protocol
+#: is platform-neutral and this file is the one place that has to explain
+#: itself to a user, so it should not stop making sense off Windows.
+_EADDRINUSE = 98
+_EACCES = 13
+
+
+def describe_startup_error(error: BaseException, port: int) -> str:
+    """Turn a failure to bind into a sentence the user can act on.
+
+    Every branch says what to do next, not just what went wrong. "Port 8765 is
+    already in use" is only useful if the user is also told that the usual
+    cause is a second copy of the app they have not noticed.
+    """
+    code = getattr(error, "winerror", None) or getattr(error, "errno", None)
+
+    if code in (_WSAEADDRINUSE, _EADDRINUSE):
+        return (
+            f"Port {port} is already in use, so TapDesk cannot accept "
+            "connections from your phone.\n\n"
+            "Another copy of TapDesk is almost certainly already running. "
+            "Look for it in the system tray, right-click it and choose Quit, "
+            "then start TapDesk again."
+        )
+
+    if code in (_WSAEACCES, _EACCES):
+        return (
+            f"Windows refused to let TapDesk open port {port}.\n\n"
+            "Another program may be using that port, or a firewall is blocking "
+            "it. Close anything else that might be using it, or restart Windows "
+            "and try again."
+        )
+
+    return (
+        f"TapDesk could not start listening on port {port}.\n\n"
+        f"The system said: {error}"
+    )
+
+
+class StartupError(Exception):
+    """The companion could not start, with a reason the user can act on.
+
+    Its message is written for someone who has never seen this program, not
+    for whoever is debugging it. The original "the companion server did not
+    start listening" told the user nothing, and neither did the traceback
+    behind it, because that was thrown on a background thread and never once
+    mentioned the port.
+    """
 
 
 class _Bridge:
@@ -139,6 +194,7 @@ class Companion:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._started = threading.Event()
+        self._startup_error: BaseException | None = None
         self._exit: asyncio.Event | None = None
         self._tick_task: Any = None
         self._stopping = False
@@ -278,7 +334,18 @@ class Companion:
     async def _serve(self) -> None:
         """The backend coroutine, running on its own loop in a thread."""
         self._exit = asyncio.Event()
-        await self._server.start(port=self._pairing.port)
+        try:
+            await self._server.start(port=self._pairing.port)
+        except OSError as exc:
+            # Recorded rather than raised. This runs on a background thread, so
+            # an exception here dies quietly in the thread and leaves
+            # start_backend waiting for a socket that will never bind - which
+            # is how a port already in use became "the companion server did
+            # not start listening" with no hint of why.
+            self._startup_error = exc
+            self._started.set()
+            return
+
         self._tick_task = asyncio.create_task(self._run_ticks())
         self._started.set()
         self._publish_link()
@@ -320,6 +387,11 @@ class Companion:
         Waiting for `_started` is what turns "we scheduled the server and
         hoped" into something verifiable: `connected_count` and a real
         connection only work if the socket is genuinely bound.
+
+        Raises [StartupError] with something the user can act on. The point of
+        the wording is that "port 8765 is already in use, another copy of
+        TapDesk is probably running" is a sentence someone can fix, where
+        "did not start listening" is not.
         """
         if self._thread is not None:
             return
@@ -331,7 +403,12 @@ class Companion:
         self._thread.start()
 
         if not self._started.wait(timeout):
-            raise TimeoutError("the companion server did not start listening")
+            raise StartupError(
+                f"TapDesk did not start listening on port {self._pairing.port}."
+            )
+
+        if self._startup_error is not None:
+            raise StartupError(describe_startup_error(self._startup_error, self._pairing.port))
 
     def _run_loop(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -387,7 +464,14 @@ class Companion:
         return self._run_gui()
 
     def _run_headless(self) -> int:
-        self.start_backend()
+        try:
+            self.start_backend()
+        except StartupError as exc:
+            # Printed and exited non-zero, so a script or the installer notices.
+            # The traceback that used to appear here said nothing about the port.
+            print(f"\nTapDesk could not start.\n\n{exc}", file=sys.stderr)
+            return 1
+
         self._print_banner()
         print("Press Ctrl+C to stop.")
         try:
@@ -412,7 +496,13 @@ class Companion:
             post = Signal(object)
             stop = Signal()
 
-        self._app = QApplication(sys.argv)
+        # Only the program name is passed. Handing our own --config-dir and
+        # --port to Qt means it parses them as Qt options, and it does not
+        # reliably leave alone the ones it does not recognise. The visible
+        # symptom was a startup-failure dialog that appeared for a fraction of
+        # a second and closed itself, which is worse than no dialog at all.
+        self._app = QApplication([sys.argv[0]])
+        self._app.setApplicationName("TapDesk")
         self._app.setQuitOnLastWindowClosed(False)
 
         # Every call that touches a widget is routed through this emitter.
@@ -440,14 +530,24 @@ class Companion:
         self._window.set_session(self._pairing.current())
         self._window.set_devices(self._devices.devices)
         self._window.set_hotkey_hint(STOP_HOTKEY)
-        self._window.show()
 
         self._tray = Tray(callbacks)
         self._tray.show_requested = self._window.show
         self._tray.activated.connect(self._on_tray_activated)
-        self._tray.show()
 
-        self.start_backend()
+        try:
+            self.start_backend()
+        except StartupError as exc:
+            # A frozen build has no terminal to print to, and PyInstaller's
+            # traceback dialog shows a teacher a Python stack trace. Worse, it
+            # said nothing about the cause: the exception came from a thread,
+            # so the user was left with "did not start listening" and no idea
+            # that another copy of the app was holding the port.
+            self._explain_and_quit(str(exc))
+            return 1
+
+        self._tray.show()
+        self._window.show()
         self._print_banner()
         self._refresh_window()
 
@@ -459,6 +559,44 @@ class Companion:
         finally:
             self.stop_backend()
             self._simulator.release_all()
+
+    def _explain_and_quit(self, message: str) -> None:
+        """Tell the user why TapDesk stopped, in words, then close.
+
+        Two channels, deliberately. A dialog is the friendly one, but a dialog
+        is a window: it can be suppressed, auto-dismissed, or blocked by
+        whatever else has focus, and a startup failure is exactly the moment
+        where the user least needs to be left guessing. So the same words are
+        written to startup-error.log in the config directory, and the dialog
+        says where that is.
+
+        No traceback either way. This is the first thing most users will ever
+        see if something is wrong, and a stack trace through files they have
+        never heard of is not an explanation.
+        """
+        log.error("startup failed: %s", message)
+
+        path = self.config_dir / "startup-error.log"
+        try:
+            path.write_text(
+                f"TapDesk could not start.\n\n{message}\n\n"
+                f"Full detail, if you need it:\n{traceback.format_exc()}\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:  # pragma: no cover - best effort
+            log.warning("could not write startup-error.log: %s", exc)
+
+        try:
+            from PySide6.QtWidgets import QMessageBox
+
+            box = QMessageBox(
+                QMessageBox.Icon.Critical, "TapDesk could not start", message
+            )
+            box.setWindowTitle("TapDesk could not start")
+            box.setInformativeText(f"The same message is saved at {path}")
+            box.exec()
+        except Exception:  # pragma: no cover - the log is the guarantee
+            log.exception("could not show the error dialog")
 
     def _install_hotkey(self) -> None:
         """Register a global emergency stop.
