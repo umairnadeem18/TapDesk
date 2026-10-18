@@ -378,12 +378,38 @@ work — with nothing but the public website as instructions.
 | 0 - Toolchain | 7 | Complete |
 | 1 - Freeze the contract | 4 | Complete |
 | 2 - App foundation | 5 | Complete |
-| 3 - Screens | 4 screens + settings | Complete; keyboard needs a look on a real device |
-| 4 - Transport | 7 | Complete, 160 tests |
+| 3 - Screens | 4 screens done, **settings not built** | The four tabs are complete. Task 3.5 is still the placeholder screen - see below |
+| 4 - Transport | 7 | Complete, 175 tests |
 | 5 - Desktop companion | 14 | Complete, 190 tests, installer built and published |
 | 6 - Integration and test | 7 | In progress - happy path verified on hardware, failure cases outstanding |
-| 7 - Release | 7 | In progress; site live, binaries published, keystore still unbacked |
+| 7 - Release | 7 | In progress; site live, binaries published, keystore backed up **locally only** |
 | 8 - iOS and macOS | - | Deferred on purpose, see below |
+
+### Phase 3 correction
+
+Phase 3 was previously marked complete. It is not, and the error was mine:
+I read "four screens built and working" as "Phase 3 done" without noticing that
+**task 3.5, Settings, is still a placeholder**. The screen says so — "Settings
+arrive in Phase 3.5" — and behind it are the tasks the plan filed under 3.5:
+
+- Cursor speed (the simulator supports it; nothing in the app sets it)
+- Acceleration curve
+- Haptics on/off
+- Left-handed layout (MouseTab takes `leftHanded` and the layout already mirrors,
+  but nothing passes it a value)
+- Keep-screen-awake (currently hardcoded on while connected, with no way to turn
+  it off)
+- Safe Mode (exists on the PC only)
+- Disconnect (now reachable via the back button instead)
+- The paired-device list with revoke (the store has it; there is no UI for it)
+
+The keyboard's type-and-dictate field is also unfinished: the plan calls for
+voice input and Urdu via the phone's native keyboard, and the field has never
+been confirmed to receive on-screen key input.
+
+None of this blocks the product working, and the four tabs that people actually
+use during a lecture are done. But "complete" was the wrong word and it should
+not have been written down as such.
 
 ### What "complete" means here, and what it does not
 
@@ -446,10 +472,19 @@ that asserts nothing *complained* is not a test that something *happened*.
    - Revoke the phone from the PC, then reconnect from the phone.
    - Two phones, both paired.
    - Latency on a phone hotspot, not just home Wi-Fi.
-2. **Task 7.2.** The release keystore still needs backing up off this machine.
-   Losing it means never being able to update the app again.
-3. **Task 7.7.** Play Store preparation, once the above is solid.
-4. **Phase 8** remains deliberately untouched until Phase 7 has shipped.
+2. **Task 3.5, the Settings screen.** Eight settings, most of which already
+   exist in the code and need only a control. Left-handed layout and cursor
+   speed are the two a user is most likely to want during a lecture.
+3. **Task 7.2, off-machine keystore backup.** The local copy is made and
+   verified, but it sits on the same drive as the original and so protects
+   against nothing that matters. It needs to go somewhere else — a cloud
+   drive, an email to yourself, a USB stick in another room.
+4. **Code signing for the Windows installer.** Unsigned installers draw a
+   SmartScreen warning on every user's machine. There is no cheap fix; a
+   certificate has to be bought and the build has to be reproducible enough to
+   keep renewing it.
+5. **Task 7.7.** Play Store preparation, once the above is solid.
+6. **Phase 8** remains deliberately untouched until Phase 7 has shipped.
 
 ### Phase 8 - iOS and macOS (deferred)
 
