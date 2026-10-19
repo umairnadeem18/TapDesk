@@ -459,58 +459,73 @@ Bugs found only by this testing, all of which had passed every automated test:
 The lesson, recorded because it cost three separate rounds of testing: a test
 that asserts nothing *complained* is not a test that something *happened*.
 
-### OPEN BUG - pairing fails after the beta.3 PC reinstall (2026-10-18)
+### Pairing failure after the beta.3 PC reinstall - DIAGNOSED (2026-10-19)
 
-**Reported by the user on real hardware. Undiagnosed. Nothing was changed in
-response - recorded only, to be picked up next session.**
+**Reported by the user on real hardware 2026-10-18. Diagnosed 2026-10-19.
+Cause found and the product/harness hardened accordingly.**
 
 What happened, in the user's terms: after reinstalling `TapDesk-1.0.0-setup.exe`
 from v1.0.0-beta.3 and installing the matching APK over the top of the previous
-one, **the QR code no longer pairs**. There are two distinct symptoms, and
-whether it is one bug or two is not yet known:
+one, the QR code no longer pairs. Two symptoms: the pairing screen loads
+continuously, or the app reaches the tabs and says "disconnected".
 
-- The pairing screen **loads continuously** and never resolves.
-- Or the app **gets as far as the slides layout and says "disconnected"**.
+**Cause: the companion was simply not running.** On the morning after the
+reinstall there was no TapDesk process, nothing listening on port 8765, and the
+Run-key autostart entry was absent (autostart is off by default). A phone with
+nothing to connect to produce exactly both reported symptoms: a fresh QR scan
+spins forever against a closed port, and a stored pairing optimistically shows
+the tabs while never connecting.
 
-This is a regression against beta.2, where pairing worked on this exact setup.
-The only changes since are the settings work: two new messages (`set`,
-`forget`), the `settings` push added to the post-`auth_ok` greeting, and the
-settings screen itself.
+Eliminated on the way to that conclusion:
 
-Hypotheses, in the order worth checking. **None of these have been tested -
-they are a starting order, not findings.**
+1. **Certificate regeneration - ruled out.** The reinstall landed at
+   `D:\TapDesk` (not `%LOCALAPPDATA%\Programs\TapDesk` as before), but the
+   config directory is `Path.home()/.tapdesk` and is independent of install
+   location. The certificate there predated the reinstall; the fingerprint did
+   not change.
+2. **Stale certificate held by the phone - the real residual risk.** After the
+   uninstall/reinstall the PC device list (`devices.json`) was empty while the
+   phone still held a pairing. Any reconnect gets `E_REVOKED` and the phone
+   returns to pairing, which works - but only once a running companion exists.
+3. **The PyInstaller bundle differing from source - ruled out by probe.** A new
+   diagnostic, `companion/tools/probe_shipped_binary.py`, drives the *installed*
+   exe (never done before: all 200 Python tests run from source): it starts the
+   shipped exe headless, verifies TLS + `hello_ok`, confirms an unknown device
+   key is refused with `E_REVOKED` (not a hang), and confirms headless refuses a
+   pairing token. The shipped binary was healthy.
+4. **The packaging-bundle hypothesis therefore closed**, with a permanent probe
+   so any future report can be checked against the actual product binary in
+   minutes rather than guessed at.
 
-1. **The reinstall moved or regenerated the companion's certificate.** Pairing is
-   keyed on the certificate fingerprint, not the IP address, precisely so that a
-   network change does not break it. If the reinstall landed on a different
-   config directory, the fingerprint in the QR is one the phone has never seen,
-   and the phone also still holds a stored pairing for the *old* fingerprint.
-   The two would fight, and a phone trying a dead stored pairing before trying
-   a perfectly good scanned one would look exactly like a pairing that hangs.
-   Worth checking first, because it is the most likely and the cheapest to
-   confirm: compare the fingerprint in the QR against the one stored in the
-   phone's paired-device list, and against `%LOCALAPPDATA%\Programs\TapDesk`.
-2. **The `settings` push is a new frame in the post-`auth_ok` greeting**, and
-   three tests read a fixed number of frames at that point rather than by name.
-   All three were fixed and pass, but the pairing screen is the one place where
-   an unexpected frame during the handshake would stall rather than error -
-   worth confirming the phone tolerates it rather than waiting for a frame that
-   the handshake machine does not recognise in the state it is in.
-3. **A message-order or validation failure in the new companion build.** The
-   Python suite is 200 green and the phone suite 177, but every one of those
-   tests starts a companion from source, never the PyInstaller-packaged exe the
-   user actually installed. A packaging difference - a stale `.pyc`, a missing
-   module collected into the bundle - would pass every test in the repository
-   and fail only in the shipped binary.
+Two genuine defects were found while confirming none of the above were to
+blame, both fixed:
 
-Note that the settings screen itself has therefore **not yet been verified on
-hardware at all**, and neither has cursor speed, which was the main reason for
-building it. Treat v1.0.0-beta.3 as untested rather than as a working release.
+- **A test suite that drove the developer's real desktop.** `InputSimulator`
+  fell back to `pynput` when constructed without an executor, so every
+  companion started with `--headless` (the `--print-link` path, and the Dart
+  cross-implementation tests) moved the real mouse and pressed real keys - the
+  moving pointer and Ctrl+P print dialog the user kept hitting. Real input is
+  now opt-in (`desktop_input=True`), accepted only by the windowed companion;
+  headless can never inject. Locked in by `test_no_desktop_injection.py`,
+  which overrides the import machinery so a headless code path reaching pynput
+  fails loudly. Mutation-checked.
+- **The phone blamed the network instead of naming the cause.** A connect
+  failure said "check they are on the same Wi-Fi" while the actual cause was a
+  companion that was not running. The message now leads with the most likely
+  cause: check TapDesk is running on the computer first, Wi-Fi second.
+- Also: a cross-implementation test race (a shared config directory handing
+  back the previous test's pairing token) that failed only on a busy machine.
 
-Also still outstanding from this session: the website deploy. The source is
-correct and committed, but Vercel needs a token this session did not have, and
-the standing rule is that the token is never pasted into chat. The live site
-therefore still serves beta.2.
+Current state of this machine after the diagnosis: old install uninstalled,
+fixed companion rebuilt with the opt-in input gate and installed at
+`%LOCALAPPDATA%\Programs\TapDesk`. The firewall rule from the previous install
+was removed at uninstall and was **not** recreated by the silent per-user
+install (adding it requires elevation) - pairing will fail until it is added
+again.
+
+Note that the settings screen still has **not yet been verified on hardware at
+all**, and neither has cursor speed, which was the main reason for building it.
+Treat beta.4 as the build to verify them.
 
 ### Remaining work, in order
 
