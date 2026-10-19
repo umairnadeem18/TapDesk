@@ -53,11 +53,33 @@ class HeldState:
         self.buttons.clear()
 
 
+def inert_executor(action: tuple) -> None:
+    """Accept an action and do nothing with it.
+
+    The default executor, and the whole point of this module's change: a
+    simulator built without being told otherwise must not be able to move the
+    pointer or press a key on the machine running it. Logging at debug rather
+    than warning keeps the noise out of a normal run while still leaving a
+    trail if someone wonders why nothing happened.
+    """
+    log.debug("inert executor dropped %s", action)
+
+
 class InputSimulator:
     """Applies plans to the desktop.
 
-    `executor` is injected so the run loop can be driven without moving a real
-    mouse. In production it wraps `pynput`; in tests it records.
+    `executor` is injected: it decides whether anything reaches a real screen.
+
+    There is deliberately **no default that touches the desktop**. An earlier
+    version fell back to `pynput` when no executor was given, which meant every
+    test that constructed a bare `InputSimulator` silently drove the real mouse
+    and the real keyboard of whoever was running it. That is not a theoretical
+    hazard: it moved the developer's pointer mid-sentence and pressed Ctrl+P on
+    whatever window had focus, opening a print dialog. A test suite is not
+    allowed to do that to the person running it.
+
+    So the default is inert and logs. Performing real input is now something a
+    caller has to ask for explicitly, by passing `desktop_input=True`.
     """
 
     def __init__(
@@ -66,8 +88,14 @@ class InputSimulator:
         max_speed: float = MAX_SPEED,
         dead_zone: float = DEAD_ZONE,
         curve: float = CURVE,
+        desktop_input: bool = False,
     ) -> None:
-        self._execute = executor or self._default_executor
+        self._execute = executor or (
+            self._desktop_input_executor if desktop_input else inert_executor
+        )
+        # Kept for callers that inspect it, and so a test can assert that a
+        # simulator built the safe way never performs anything.
+        self.desktop_input = desktop_input and executor is None
         self.max_speed = max_speed
         self.dead_zone = dead_zone
         self.curve = curve
@@ -192,7 +220,7 @@ class InputSimulator:
 
     # -- the real desktop --------------------------------------------------
 
-    def _default_executor(self, action: tuple) -> None:
+    def _desktop_input_executor(self, action: tuple) -> None:
         """Perform an action with pynput.
 
         Imported lazily so the module can be imported - and tested - on a

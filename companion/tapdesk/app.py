@@ -177,7 +177,20 @@ class Companion:
             port=port,
             fingerprint=self._certificate.fingerprint,
         )
-        self._simulator = InputSimulator()
+        self._simulator = InputSimulator(
+            # Headless means nobody is watching, which is exactly when a stray
+            # injection is least likely to be noticed and most likely to be a
+            # test run. `--headless` is what `--print-link` uses and what the
+            # Dart cross-implementation tests start, so allowing real input
+            # there let a test suite drive the real mouse and keyboard of
+            # whoever ran it - moving the pointer and pressing Ctrl+P on
+            # whatever window had focus.
+            #
+            # The windowed companion still performs real input, which is the
+            # entire product. The rule is simply that performing it is asked
+            # for, never assumed.
+            desktop_input=not self.headless,
+        )
 
         self._bridge = _Bridge()
         self._server = PairingServer(
