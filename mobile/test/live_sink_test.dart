@@ -220,8 +220,25 @@ void main() {
       expect(message, contains('Scan it again'));
     });
 
-    test('anything else points at the Wi-Fi', () {
-      expect(describeConnectFailure(StateError('boom')), contains('same Wi-Fi'));
+    test('anything else names the companion before the network', () {
+      // The state this was wrong about: the phone and the PC were on the same
+      // Wi-Fi, and the message told the user to check that. What was actually
+      // true is that the companion was not running - the state the app is in
+      // immediately after a reinstall, because the installer only offers to
+      // start it.
+      //
+      // Both causes fit in one message because a refused TCP connection looks
+      // identical either way. The order is the part being asserted: the thing
+      // a user cannot rule out in a second comes first.
+      final message = describeConnectFailure(StateError('boom'));
+
+      expect(message, contains('TapDesk is running'));
+      expect(message, contains('same Wi-Fi'));
+      expect(
+        message.indexOf('TapDesk is running'),
+        lessThan(message.indexOf('same Wi-Fi')),
+        reason: 'the most likely cause must be the first one named',
+      );
     });
   });
 

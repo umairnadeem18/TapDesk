@@ -266,5 +266,17 @@ String describeConnectFailure(Object error) {
     };
   }
   debugPrint('[tapdesk] connect failed: $error');
-  return 'Could not reach that computer. Check they are on the same Wi-Fi.';
+
+  // Ordered by how often each is the actual cause, not by how interesting it
+  // is. This message was "check they are on the same Wi-Fi", which sent the
+  // user looking at their router while the real problem was that the companion
+  // was not running at all - the state the app is in immediately after a
+  // reinstall, because the installer only offers to start it.
+  //
+  // A refused TCP connection is the same error either way, so the one message
+  // has to carry both causes. Naming the first is the point: somebody whose
+  // phone and PC are on the same Wi-Fi can rule that out in a second and needs
+  // to be told what to check instead.
+  return 'Could not reach the computer. Check TapDesk is running on it, '
+      'and that you are on the same Wi-Fi.';
 }

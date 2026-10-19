@@ -139,6 +139,10 @@ Future<void> _waitForPort(
 
 /// Start a companion on [port].
 Future<void> _startCompanion(int port) async {
+  // Taken before the launch, not after. Stamping it once the port is up would
+  // measure how long the *wait* took rather than when the companion started,
+  // and a previous test's link would sometimes fall on the right side of it.
+  final launchedAt = DateTime.now();
   companion = await _Child.start(
     python.path,
     [
@@ -153,6 +157,7 @@ Future<void> _startCompanion(int port) async {
     workingDirectory: '../companion',
   );
   await _waitForPort(port, child: companion!);
+  await _awaitFreshLink(configDir, launchedAt);
 }
 
 /// Start the test fixture that approves pairing.
@@ -161,6 +166,7 @@ Future<void> _startCompanion(int port) async {
 /// anyone who can reach the port is exactly what the Allow prompt exists to
 /// withhold, and it should not be one mistyped argument away from every user.
 Future<void> _startApprovingCompanion() async {
+  final launchedAt = DateTime.now();
   approving = await _Child.start(
     python.path,
     [
@@ -173,6 +179,39 @@ Future<void> _startApprovingCompanion() async {
     workingDirectory: '../companion',
   );
   await _waitForPort(approvingPort, child: approving!, label: 'approving fixture');
+  await _awaitFreshLink(approvingConfigDir, launchedAt);
+}
+
+/// Wait until the companion has written *this* session's pairing link.
+///
+/// Binding the port and having a pairing link are two different moments, and
+/// every test in this file shares one config directory. So a link written by
+/// the previous test is sitting right there when the new companion binds, and
+/// `_printLink` - a separate process reading that file - will happily hand back
+/// the previous test's token.
+///
+/// The phone then authenticates with a token this companion has never heard of
+/// and is refused at once, so the test fails expecting `auth_pending` and gets
+/// an `auth_err` naming nothing useful. It passed on a quiet machine and failed
+/// on a busy one, which is the signature of a race rather than a defect.
+///
+/// Waiting for a link newer than the launch closes it. Checking that the file
+/// merely exists would not: the stale one always exists.
+Future<void> _awaitFreshLink(Directory dir, DateTime launchedAt) async {
+  final link = File('${dir.path}/pairing.link');
+  final deadline = DateTime.now().add(const Duration(seconds: 45));
+
+  while (DateTime.now().isBefore(deadline)) {
+    if (link.existsSync() && !link.lastModifiedSync().isBefore(launchedAt)) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  }
+  fail(
+    'the companion never wrote a fresh pairing link in ${dir.path}.\n'
+    'It bound the port but published no new code, so the token used here would '
+    "be the previous test's.",
+  );
 }
 
 /// The companion's own view of its pairing link.
@@ -412,7 +451,19 @@ test('a phone that scans a code gets nothing without approval', () async {
     socket.send(jsonEncode({'t': 'auth', 'token': link.token}));
 
     // auth_pending first: the companion is asking its user, who is not there.
-    expect((await frames.next())['t'], 'auth_pending');
+    //
+    // The actual reply is named in the failure. "Expected auth_pending, got
+    // auth_err" does not say *which* error, and the difference between a spent
+    // token, a bad token and a wrong fingerprint is the entire difference
+    // between three completely different bugs. This test spent a long time
+    // unanswerable for exactly that reason.
+    final asking = await frames.next();
+    expect(
+      asking['t'],
+      'auth_pending',
+      reason: 'the companion asked with ${jsonEncode(link.token)}, and replied '
+          '${jsonEncode(asking)}',
+    );
 
     final decision = await frames.next();
     expect(decision['t'], 'auth_err');
