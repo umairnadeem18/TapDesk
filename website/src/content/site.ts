@@ -22,45 +22,47 @@
  */
 export const RELEASES = {
   android: {
-    version: "v1.0.0-beta.3",
+    version: "v1.0.0-beta.4",
     size: "25.0 MB",
     minAndroid: "Android 8.0 (API 26)",
-    // SHA-256 of TapDesk-v1.0.0-beta.3-arm64-v8a.apk
+    // SHA-256 of TapDesk-v1.0.0-beta.4-arm64-v8a.apk
     sha256:
-      "693259e2ab86a1ed448c1cdbb85d25a3dbf08a4df4c85fd0fff61f991a5bf836",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.3/TapDesk-v1.0.0-beta.3-arm64-v8a.apk",
+      "4dc3cc1848e64902cc4a349480c858e1169f8931bb4a5ffbad77c2db4f702ce2",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.4/TapDesk-v1.0.0-beta.4-arm64-v8a.apk",
     variants: [
       {
         id: "arm64-v8a",
         label: "Most phones (2017 and newer)",
         size: "25.0 MB",
         sha256:
-          "693259e2ab86a1ed448c1cdbb85d25a3dbf08a4df4c85fd0fff61f991a5bf836",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.3/TapDesk-v1.0.0-beta.3-arm64-v8a.apk",
+          "4dc3cc1848e64902cc4a349480c858e1169f8931bb4a5ffbad77c2db4f702ce2",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.4/TapDesk-v1.0.0-beta.4-arm64-v8a.apk",
       },
       {
         id: "armeabi-v7a",
         label: "Older or budget phones",
-        size: "21.0 MB",
+        size: "21.1 MB",
         sha256:
-          "46b39b7090b3f99a3c05d619d47fa075711b4cdc2c13aa8ec45b2e341b0a5de3",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.3/TapDesk-v1.0.0-beta.3-armeabi-v7a.apk",
+          "1fa1b5ee4538aeff7bfc3e9140d4784fb94a5c4e28bd32c8e1f4d1e61aa7541c",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.4/TapDesk-v1.0.0-beta.4-armeabi-v7a.apk",
       },
     ],
   },
   windows: {
-    version: "v1.0.0",
+    version: "v1.0.0-beta.4",
     size: "58.7 MB",
     minWindows: "Windows 10 / 11 (64-bit)",
-    // SHA-256 of TapDesk-1.0.0-setup.exe, rebuilt for beta.3.
+    // SHA-256 of TapDesk-1.0.0-setup.exe, rebuilt for beta.4.
     //
     // The companion is not cosmetic to this release: it now understands the
     // settings messages the phone sends, and an older companion silently drops
     // them. Publishing a new APK against an old installer would leave every
-    // slider inert while looking entirely healthy.
+    // slider inert while looking entirely healthy. This rebuild also carries
+    // the rule that performing real input is opt-in: a packaged companion
+    // started headless (print-link, tests) can never move the real mouse.
     sha256:
-      "aa3a115eadc872a8895ae62761e67618f731e02b3c8dfecc9574d290dcd4c255",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.3/TapDesk-1.0.0-setup.exe",
+      "1a10eb50ab6628438e275c1280f6ec7a0f2253c5a08dfde5604457ef0280ea5c",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.4/TapDesk-1.0.0-setup.exe",
   },
 };
 
