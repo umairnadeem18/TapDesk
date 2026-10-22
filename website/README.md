@@ -18,6 +18,34 @@ npm start
 Set `NEXT_PUBLIC_SITE_URL` (see `.env.example`) before deploying so canonical
 links, `sitemap.xml` and `robots.txt` point at the real domain.
 
+## Deploying (the recipe that actually works on this machine)
+
+The `vercel deploy` run from inside this repository uploads 1.6 GB and dies
+with "File size limit exceeded (100 MB)": the CLI's file gathering walks past
+this directory into the repo, picking up the 196 MB debug APK in
+`mobile/build` along the way. `.vercelignore` (present in this directory) did
+not save it. `vercel build --prebuilt` also does not work here — the build
+output needs symlinks, which Windows refuses without Developer Mode, and this
+machine deliberately runs without admin rights.
+
+The recipe that works:
+
+1. Copy only what the build needs to a directory **outside** the repo —
+   `package.json`, `package-lock.json`, `next.config.ts`, `tsconfig.json`,
+   `vercel.json`, `.env.local`, `eslint.config.mjs`, plus `src/`, `public/`,
+   `scripts/`. A fresh copy is under half a megabyte.
+2. If the project's dashboard setting has **Root Directory** = `website`
+   (it normally does), clear it first or the CLI refuses with "The specified
+   Root Directory does not exist": PATCH
+   `https://api.vercel.com/v9/projects/<projectId>?teamId=<teamId>` with
+   `{"rootDirectory": null}`. The token comes from
+   `%APPDATA%\com.vercel.cli\Data\auth.json`. Restore `{"rootDirectory":
+   "website"}` afterwards so Git-driven settings stay as configured.
+3. In the copy: `vercel link --yes --project tap-desk`, then
+   `vercel deploy --prod --yes`. The remote build installs and builds.
+4. Confirm `https://tap-desk.vercel.app/download` serves the just-published
+   release links.
+
 ## Structure
 
 ```
