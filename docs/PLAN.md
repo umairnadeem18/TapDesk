@@ -518,14 +518,72 @@ blame, both fixed:
 
 Current state of this machine after the diagnosis: old install uninstalled,
 fixed companion rebuilt with the opt-in input gate and installed at
-`%LOCALAPPDATA%\Programs\TapDesk`. The firewall rule from the previous install
-was removed at uninstall and was **not** recreated by the silent per-user
-install (adding it requires elevation) - pairing will fail until it is added
-again.
+`%LOCALAPPDATA%\Programs\TapDesk`, launch verified (listening on 8765, no
+startup errors) while the user tests. The firewall rule removed at uninstall
+was re-added with elevation and verified with netsh: inbound TCP 8765, all
+profiles, Allow - note that `Get-NetFirewallRule` answers Access denied in a
+non-elevated session, which had made an earlier check report the rule as
+missing; `netsh advfirewall firewall show rule name="..."` is the reliable
+check on this machine.
+
+Published v1.0.0-beta.4 (2026-10-19, release id 417284147): arm64 APK
+sha `4dc3cc18…02ce2` (25.0 MB), armv7 sha `1fa1b5ee…7541c` (21.1 MB), and the
+rebuilt setup.exe sha `1a10eb50…80ea5c` (58.7 MB) - all three verified
+byte-identical to the local files after upload. Signer unchanged
+(`02bf814f…226e20`), so the APK installs over beta.3 without an uninstall.
 
 Note that the settings screen still has **not yet been verified on hardware at
 all**, and neither has cursor speed, which was the main reason for building it.
 Treat beta.4 as the build to verify them.
+
+### The beta.4 "connecting forever" report - cause and fixes (2026-10-23)
+
+**Reported after the settings build:** the QR would seemingly not pair; the app
+said "connecting" and the loop never ended. Two things were true at once, and
+only one of them was the phone's fault.
+
+**The PC side was the actual breaker.** At the start of the session there was
+no TapDesk process and nothing listening on 8765 - the sequel to the
+beta.3-reinstall state recorded above. The phone did everything right and the
+machine said nothing. Remedied and, this time, made to stay remedied:
+
+- The installed companion is running again and listening on 8765.
+- **Start with Windows is now enabled** (the Run key
+  `HKCU\…\CurrentVersion\Run → TapDesk` points at the installed exe, set
+  through `TapDesk.exe --autostart on`). It stays opt-in in the product; it is
+  on here because the school of "start it by hand every class" had already
+  failed twice on this machine.
+- `companion/tools/probe_lan_reach.py` (untracked until now, committed) walks
+  the path a phone walks - TCP to the real Wi-Fi interface, TLS with the
+  fingerprint the QR advertises, hello answered with `hello_ok`. All green.
+
+**Two genuine app defects fixed while confirming the above.** Both were found
+reading the loop the user experienced rather than guessing at it:
+
+1. **The failure reason never reached the screen.** `describeConnectFailure`
+   ("Check TapDesk is running on the computer…") was delivered through
+   `SessionDelegate.onError` into a `ValueNotifier` that no widget ever read.
+   The banner reads only `ConnectionInfo`, so the user watched the connect /
+   reconnect loop go by with never a word about what to do - which is exactly
+   what "it says connecting forever" looked and felt like. Reasons now ride on
+   the status snapshot itself (`session._publish`, the sink's connect-failure
+   path), the controller preserves a recorded reason across the
+   reconnect-wait transitions, and a fresh attempt clears it.
+
+2. **Resuming the app could kill a healthy pairing in progress.** `retryNow()`
+   fired on every `AppLifecycleState.resumed` and interrupted *any* state. On
+   an attempt already dialling, handshaking, or waiting for the PC's Allow
+   prompt, it tore the session down underneath the dial and re-ran it - and a
+   pairing token is single-use, so the second attempt can never finish. It now
+   fires only while the backoff owns the wait (`reconnecting`).
+
+184 Flutter tests pass (six previously failing cross-implementation tests were
+a port clash with the newly running companion, not a regression - they bind
+8765 themselves and cannot run while the real product is listening).
+
+Published v1.0.0-beta.5 with both fixes; the PC side is unchanged, so the
+beta.4 installer remains current.
+
 
 ### Remaining work, in order
 

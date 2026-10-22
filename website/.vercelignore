@@ -1,0 +1,13 @@
+# The Vercel CLI tried to upload 2.7 GB for a site a few MB in size. The
+# project .gitignore already excludes node_modules and .next, but the CLI,
+# run from website/ inside the TapDesk repo, still walked into them (its root
+# detection walks up to .git). This file is honored regardless of how the CLI
+# resolves the project root: everything not needed to build the site is
+# excluded, and the remote build installs its own dependencies.
+node_modules
+.next
+.git
+.env.local
+*.tsbuildinfo
+dev.log
+README.md
