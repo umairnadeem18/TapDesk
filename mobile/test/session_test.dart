@@ -59,7 +59,12 @@ class _RecordingDelegate implements SessionDelegate {
   }
 
   @override
-  void onStatus(ConnectionInfo info) => statuses.add(info.status);
+  void onStatus(ConnectionInfo info) {
+    statuses.add(info.status);
+    snapshots.add(info);
+  }
+  /// The full snapshots, so tests can assert on the reason a status carried.
+  final List<ConnectionInfo> snapshots = [];
 
   @override
   void onError(String message) => errors.add(message);
@@ -305,6 +310,18 @@ void main() {
       await pump();
 
       expect(delegate.savedKeys, isEmpty);
+    });
+
+    test('a denial is carried on the status snapshot, not only as an event', () async {
+      await connect(token: 'TOKEN');
+      socket.emit(frame({'t': 'hello_ok', 'v': 1, 'pc': {'name': 'PC'}}));
+      await pump();
+      socket.emit(frame({'t': 'auth_err', 'code': 'E_DENIED'}));
+      await pump();
+
+      expect(delegate.snapshots.last.lastError, delegate.errors.single,
+          reason: 'the banner reads the snapshot alone; a reason that only '
+              'rides as an event is never actually shown to the user');
     });
   });
 

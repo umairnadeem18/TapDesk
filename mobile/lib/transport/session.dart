@@ -189,11 +189,16 @@ class TapDeskSession extends EventSink {
 
   void _publish(ConnectionStatus status, {String? pcName, String? error}) {
     if (error != null) delegate.onError(error);
+    // The reason rides with the status, not only through onError: the banner
+    // reads ConnectionInfo alone, so a reason delivered purely as an event
+    // reached everybody except the one widget that could show it. A denial
+    // used to say only "Could not connect" with no word about why.
     delegate.onStatus(
       ConnectionInfo(
         status: status,
         pcName: pcName,
         paired: status == ConnectionStatus.connected,
+        lastError: error,
       ),
     );
   }

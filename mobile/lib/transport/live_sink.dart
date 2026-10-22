@@ -116,14 +116,19 @@ class LiveEventSink extends EventSink {
       // A failed certificate pin lands here. It must be reported as itself:
       // "could not connect" would leave the user retrying forever against a
       // server that is never going to be the computer they paired with.
-      delegate.onError(describeConnectFailure(error));
+      final reason = describeConnectFailure(error);
+      delegate.onError(reason);
       // Reporting the drop as well as the reason is what keeps the retry loop
       // alive. Without it the status stayed `connecting` with nobody left to
-      // schedule the next attempt, and the app sat there for good.
+      // schedule the next attempt, and the app sat there for good. The reason
+      // rides on the status too: the banner reads the snapshot alone, and
+      // without it the user watched the loop go by with never a word about
+      // what to do - the "connecting forever" report, in full.
       delegate.onStatus(
         ConnectionInfo(
           status: ConnectionStatus.reconnecting,
           pcName: payload.name,
+          lastError: reason,
         ),
       );
       _connecting = false;

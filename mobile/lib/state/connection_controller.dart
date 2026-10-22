@@ -183,8 +183,21 @@ class ConnectionController extends ChangeNotifier {
   Timer? _retryTimer;
 
   void update(ConnectionInfo next) {
-    if (next == _info) return;
-    _info = next;
+    // While the reconnect loop owns the wait, a reason already on record
+    // survives a reason-less snapshot. The transport reports the status and
+    // the reason separately, and a second drop arriving mid-loop used to
+    // overwrite the stored reason with null - the banner blinking back to a
+    // bare "Reconnecting" with nothing about why.
+    final merged =
+        next.status == ConnectionStatus.reconnecting &&
+            _info.status == ConnectionStatus.reconnecting &&
+            next.lastError == null &&
+            _info.lastError != null
+        ? next.copyWith(lastError: _info.lastError)
+        : next;
+
+    if (merged == _info) return;
+    _info = merged;
     notifyListeners();
   }
 
@@ -202,11 +215,20 @@ class ConnectionController extends ChangeNotifier {
       _retryMs = 0;
     }
 
+    // A reconnecting transition keeps the reason the last attempt failed:
+    // it is scheduled immediately after that failure was reported, and
+    // wiping the message here made the banner alternate between the reason
+    // and a bare "Reconnecting" every time the wait was set. Every other
+    // state clears it - a fresh attempt starts clean and earns its reason
+    // again if it fails too.
+    final reason = error ??
+        (status == ConnectionStatus.reconnecting ? _info.lastError : null);
+
     update(_info.copyWith(
       status: status,
       // Always cleared unless a caller supplies a new message: a stale error
       // shown beside a connecting spinner reads as a live failure.
-      lastError: error,
+      lastError: reason,
       pcName: status == ConnectionStatus.revoked ? null : _info.pcName,
     ));
   }
@@ -253,8 +275,15 @@ class ConnectionController extends ChangeNotifier {
   /// Used when the app comes back to the foreground. Waiting out a 10 second
   /// backoff after the user has unlocked their phone looks broken, and the
   /// delay exists for a loop, not for one deliberate attempt.
+  ///
+  /// Fires only while the backoff owns the wait — a status of `reconnecting`.
+  /// An attempt still in flight (`connecting`, `handshaking`,
+  /// `awaitingApproval`) must not be interrupted: the retry tears the session
+  /// down underneath the dial and re-runs it, which at pairing time burns the
+  /// single-use token and turns one perfectly good scan into a pairing that
+  /// can never finish.
   void retryNow() {
-    if (_info.status == ConnectionStatus.connected) return;
+    if (_info.status != ConnectionStatus.reconnecting) return;
     _attempt = 0;
     _retryTimer?.cancel();
     _retryTimer = null;

@@ -31,9 +31,28 @@ class _FakeFactory implements SocketFactory {
   }
 }
 
+/// A factory whose dial throws, the way a refusal from a closed port does.
+class _FailingFactory implements SocketFactory {
+  _FailingFactory(this.error);
+
+  final Object error;
+
+  @override
+  Future<TapDeskSocket> connect({
+    required String host,
+    required int port,
+    required String fingerprint,
+  }) async {
+    throw error;
+  }
+}
+
 class _RecordingDelegate implements SessionDelegate {
   final List<ConnectionStatus> statuses = [];
   final List<String> errors = [];
+
+  /// Full snapshots, for tests that assert on the reason a status carried.
+  final List<ConnectionInfo> infos = [];
 
   @override
   String? deviceKey() => null;
@@ -45,7 +64,10 @@ class _RecordingDelegate implements SessionDelegate {
   Future<void> forgetDeviceKey() async {}
 
   @override
-  void onStatus(ConnectionInfo info) => statuses.add(info.status);
+  void onStatus(ConnectionInfo info) {
+    statuses.add(info.status);
+    infos.add(info);
+  }
 
   @override
   void onError(String message) => errors.add(message);
@@ -239,6 +261,28 @@ void main() {
         lessThan(message.indexOf('same Wi-Fi')),
         reason: 'the most likely cause must be the first one named',
       );
+    });
+
+    test('an unreachable PC puts the reason on the reconnecting snapshot', () async {
+      // The real condition this covers: nothing was listening on the PC's
+      // port, so the dial throws. The reason reaching the snapshot is what
+      // lets the banner answer "connecting forever" with what to do about it.
+      final broken = _FailingFactory(Exception('Connection refused'));
+      final rates = _RecordingDelegate();
+
+      final doomed = LiveEventSink(
+        delegate: rates,
+        keyStore: keyStore,
+        factory: broken,
+      );
+      addTearDown(doomed.dispose);
+
+      final paired = await doomed.connectTo(payload());
+      expect(paired, isFalse);
+      expect(rates.infos.last.status, ConnectionStatus.reconnecting);
+      expect(rates.infos.last.lastError, contains('TapDesk is running'),
+          reason: 'the user watched the loop go by with never a word about '
+              'what to do - the banner must say why');
     });
   });
 

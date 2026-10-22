@@ -115,4 +115,105 @@ void main() {
           reason: 'a stale error next to a spinner reads as a live failure');
     });
   });
+
+  group('failure reasons during the retry loop', () {
+    test('the reason survives a reason-less reconnecting snapshot', () {
+      final controller = ConnectionController();
+      addTearDown(controller.dispose);
+
+      controller.update(ConnectionInfo(
+        status: ConnectionStatus.reconnecting,
+        pcName: 'Teacher-Laptop',
+        lastError: 'Check TapDesk is running on the computer',
+      ));
+
+      // A second drop arriving mid-loop carries no reason of its own: the
+      // transport reports status and reason separately.
+      controller.update(ConnectionInfo(
+        status: ConnectionStatus.reconnecting,
+        pcName: 'Teacher-Laptop',
+      ));
+
+      expect(controller.info.lastError, 'Check TapDesk is running on the computer',
+          reason: 'the reason must not blink away while the loop continues');
+    });
+
+    test('the reason survives being rescheduled', () {
+      final controller = ConnectionController();
+      addTearDown(controller.dispose);
+
+      controller.update(ConnectionInfo(
+        status: ConnectionStatus.reconnecting,
+        lastError: 'Could not reach the computer',
+      ));
+      controller.scheduleReconnect();
+
+      expect(controller.info.lastError, 'Could not reach the computer',
+          reason: 'scheduleReconnect is set right after the failure; wiping '
+              'the message here is what made the banner alternate between '
+              'the reason and a bare "Reconnecting" forever');
+    });
+
+    test('a fresh attempt starts without the reason', () async {
+      final controller = ConnectionController(
+        backoff: const BackoffPolicy(stepsMs: [20], maxMs: 20),
+      );
+      addTearDown(controller.dispose);
+
+      controller.update(ConnectionInfo(
+        status: ConnectionStatus.reconnecting,
+        lastError: 'Could not reach the computer',
+      ));
+      controller.scheduleReconnect();
+      expect(controller.info.lastError, 'Could not reach the computer');
+
+      // The timer fires, the attempt begins, and the old reason must not sit
+      // beside the spinner.
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(controller.info.status, ConnectionStatus.connecting);
+      expect(controller.info.lastError, isNull);
+    });
+  });
+
+  group('retryNow', () {
+    test('does not interrupt an attempt that is still in flight', () async {
+      final controller = ConnectionController();
+      addTearDown(controller.dispose);
+
+      var attempts = 0;
+      controller.onRetry = () async => attempts++;
+
+      for (final status in const [
+        ConnectionStatus.connecting,
+        ConnectionStatus.handshaking,
+        ConnectionStatus.awaitingApproval,
+      ]) {
+        controller.goTo(status);
+
+        final before = controller.info.status;
+        controller.retryNow();
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect(attempts, 0, reason: '$status owns a live attempt');
+        expect(controller.info.status, before,
+            reason: 'retrying underneath a dial burns the one-time pairing '
+                'token and turns one good scan into a pairing that never '
+                'finishes');
+      }
+    });
+
+    test('does nothing when there is nothing to retry', () async {
+      final controller = ConnectionController();
+      addTearDown(controller.dispose);
+
+      var attempts = 0;
+      controller.onRetry = () async => attempts++;
+
+      controller.goTo(ConnectionStatus.idle);
+      controller.retryNow();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(attempts, 0);
+    });
+  });
 }
