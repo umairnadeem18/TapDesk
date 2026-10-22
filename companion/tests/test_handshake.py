@@ -9,6 +9,7 @@ only fail on a phone.
 from __future__ import annotations
 
 import asyncio
+import logging
 import ssl
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -134,6 +135,34 @@ async def _pair(harness: Harness, device_name: str = "Pixel 7") -> dict[str, Any
             # The user was asked; wait for their decision to come back.
             reply = p.decode(await ws.recv())
         return reply
+
+
+async def _pair_with_token(harness: Harness, token: str) -> dict[str, Any]:
+    """Say hello and try to pair with an explicit (possibly wrong) token."""
+    url = f"wss://127.0.0.1:{harness.port}/"
+    async with connect(url, ssl=harness.client_context()) as ws:
+        await ws.send(
+            p.encode(
+                {"t": "hello", "v": 1, "device": "Pixel 7", "platform": "android"}
+            )
+        )
+        assert p.decode(await ws.recv())["t"] == "hello_ok"
+        await ws.send(p.encode({"t": "auth", "token": token}))
+        return p.decode(await ws.recv())
+
+
+async def _pair_with_key(harness: Harness, key: str) -> dict[str, Any]:
+    """Say hello and try to reconnect with an explicit (possibly stale) key."""
+    url = f"wss://127.0.0.1:{harness.port}/"
+    async with connect(url, ssl=harness.client_context()) as ws:
+        await ws.send(
+            p.encode(
+                {"t": "hello", "v": 1, "device": "Pixel 7", "platform": "android"}
+            )
+        )
+        assert p.decode(await ws.recv())["t"] == "hello_ok"
+        await ws.send(p.encode({"t": "auth", "key": key}))
+        return p.decode(await ws.recv())
 
 
 # ---------------------------------------------------------------------------
@@ -435,5 +464,46 @@ class TestTLS:
             with pytest.raises(ssl.SSLError):
                 async with connect(url, ssl=ssl.create_default_context()):
                     pass
+        finally:
+            await harness.stop()
+
+
+class TestObservability:
+    """Every refusal must leave one line in the log naming the reason.
+
+    The night a phone looped "connect, silent close" every two seconds, the
+    companion's log showed `connection open` / `connection closed` and
+    nothing else - the refusals happened in a part of the server that kept
+    its mouth shut. These tests pin the promise that it never does again.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_wrong_token_is_refused_and_named_in_the_log(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        harness = build(tmp_path)
+        await harness.start()
+        try:
+            with caplog.at_level(logging.INFO, logger="tapdesk.server"):
+                status = await _pair_with_token(harness, token="tdk_not_the_real_one")
+            assert status["t"] == "auth_err"
+            assert status["code"] == p.E_BAD_TOKEN
+            assert "pairing token refused: mismatch" in caplog.text
+        finally:
+            await harness.stop()
+
+    @pytest.mark.asyncio
+    async def test_an_unknown_device_key_is_refused_and_named_in_the_log(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The key a phone remembers can outlive the PC's device list."""
+        harness = build(tmp_path)
+        await harness.start()
+        try:
+            with caplog.at_level(logging.INFO, logger="tapdesk.server"):
+                status = await _pair_with_key(harness, key="tdk_key_nobody_hashed")
+            assert status["t"] == "auth_err"
+            assert status["code"] == p.E_REVOKED
+            assert "device key refused" in caplog.text
         finally:
             await harness.stop()

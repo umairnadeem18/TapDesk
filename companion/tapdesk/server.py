@@ -167,6 +167,7 @@ class PairingServer:
             return
 
         state.device_name = str(message.get("device", "Unknown phone"))[:64]
+        log.info("hello from %s device=%s", state.peer, state.device_name)
 
         await self._send(
             connection,
@@ -180,6 +181,15 @@ class PairingServer:
         token = auth.get("token")
         key = auth.get("key")
 
+        # What the phone tried to say is part of the record, not a guess: the
+        # handshake's failure modes are all silent closes, and before any log
+        # was written here a looping phone produced "connection open, closed"
+        # with nothing in between - every diagnosis of it a coin flip.
+        credential = "device key" if key else "token"
+        log.info(
+            "auth from %s device=%s credential=%s", state.peer, state.device_name, credential
+        )
+
         if isinstance(key, str) and key:
             await self._authenticate_device(connection, state, key)
             return
@@ -188,6 +198,7 @@ class PairingServer:
             await self._authenticate_token(connection, state, token)
             return
 
+        log.info("auth from %s carried neither credential", state.peer)
         raise p.ProtocolError(p.E_MALFORMED, "auth carried neither token nor key")
 
     async def _authenticate_token(
@@ -197,6 +208,11 @@ class PairingServer:
         session = self._pairing.current()
 
         if not session.token.matches(token):
+            # Loud, deliberately. A phone scanning a code that this machine
+            # has already replaced (refresh after expiry or spend) deserves
+            # one line in the log naming exactly that, rather than another
+            # silent close for somebody to archaeology on.
+            log.info("pairing token refused: mismatch (peer %s)", state.peer)
             await self._send_error(connection, p.E_BAD_TOKEN)
             await self._close(connection, p.CLOSE_AUTH_FAILED)
             return
@@ -205,6 +221,7 @@ class PairingServer:
         # fails, the code on screen is dead and a new one is drawn.
         ok, code = session.token.valid()
         if not ok:
+            log.info("pairing token refused: %s (peer %s)", code, state.peer)
             await self._send_error(connection, code)
             await self._close(connection, p.CLOSE_AUTH_FAILED)
             return
@@ -217,6 +234,9 @@ class PairingServer:
 
         allowed = await self._ask_user(state.device_name, state.peer)
         if not allowed:
+            log.info(
+                "pairing with %s denied at the computer (peer %s)", state.device_name, state.peer
+            )
             await self._send_error(connection, p.E_DENIED)
             await self._close(connection, p.CLOSE_AUTH_FAILED)
             return
@@ -238,6 +258,9 @@ class PairingServer:
                 "ttl": 0,
             },
         )
+        log.info(
+            "paired %s (peer %s); new device id %s", state.device_name, state.peer, device.device_id
+        )
         await self._send_welcome()
 
     async def _authenticate_device(
@@ -248,6 +271,9 @@ class PairingServer:
         if device is None:
             # Could be revoked, or never paired. Either way the phone must
             # forget its key and scan again.
+            log.info(
+                "device key refused: unknown or revoked (peer %s)", state.peer
+            )
             await self._send_error(connection, p.E_REVOKED)
             await self._close(connection, p.CLOSE_REVOKED)
             return
@@ -256,6 +282,9 @@ class PairingServer:
         state.device_name = device.name
         state.authenticated = True
         self._devices.touch(device.device_id)
+        log.info(
+            "reconnected %s (peer %s), count now %s", device.name, state.peer, self.connected_count
+        )
 
         await self._send(
             connection, {"t": "auth_ok", "deviceId": device.device_id}

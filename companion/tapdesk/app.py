@@ -825,6 +825,34 @@ def is_autostart_enabled() -> bool:
         return False
 
 
+def _enable_file_logging(config_dir: Path) -> None:
+    """Attach exactly one companion.log handler for this config directory.
+
+    "Exactly one" is the whole point: this runs whenever [main] runs, and -
+    inside tests - main runs several times in ONE process. A naive addHandler
+    every time stacked handlers over repeated calls and wrote every line of
+    the log three times over, which is exactly what the first hour of the
+    file looked like.
+
+    The older handler is replaced rather than skipped when the directory
+    changes: two companions with different config dirs must each log to
+    their own file, not to whichever one arrived first.
+    """
+    config_dir.mkdir(parents=True, exist_ok=True)
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        if getattr(handler, "_tapdesk_file_log", False):
+            root.removeHandler(handler)
+            handler.close()
+
+    file_handler = logging.FileHandler(config_dir / "companion.log", encoding="utf-8")
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    )
+    file_handler._tapdesk_file_log = True  # type: ignore[attr-defined]
+    root.addHandler(file_handler)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="tapdesk", description="The TapDesk desktop companion."
@@ -869,14 +897,7 @@ def main(argv: list[str] | None = None) -> int:
     # is one file read instead of an unreproducible guess. Attached for every
     # run - headless included: the cross-implementation tests each pass their
     # own config-dir, so their logs land beside the certificates they use.
-    args.config_dir.mkdir(parents=True, exist_ok=True)
-    file_handler = logging.FileHandler(
-        args.config_dir / "companion.log", encoding="utf-8"
-    )
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
-    )
-    logging.getLogger().addHandler(file_handler)
+    _enable_file_logging(args.config_dir)
 
     companion = Companion(
         config_dir=args.config_dir, port=args.port, headless=args.headless

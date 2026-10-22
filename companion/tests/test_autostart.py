@@ -77,21 +77,29 @@ class TestAutostart:
 
         assert sys.executable.lower() in command.lower()
 
-    def test_the_cli_reports_success(self, capsys: pytest.CaptureFixture) -> None:
+    def test_the_cli_reports_success(
+        self, capsys: pytest.CaptureFixture, tmp_path: Path
+    ) -> None:
         from tapdesk.app import main
 
-        assert main(["--autostart", "on"]) == 0
+        # A config dir of its own, because main() attaches the companion.log
+        # handler to the root logger: without this the real ~/.tapdesk log
+        # collects every later test's pairing noise.
+        argv = ["--config-dir", str(tmp_path)]
+        assert main([*argv, "--autostart", "on"]) == 0
         assert "start when Windows starts" in capsys.readouterr().out
         assert is_autostart_enabled() is True
 
-        assert main(["--autostart", "off"]) == 0
+        assert main([*argv, "--autostart", "off"]) == 0
         assert is_autostart_enabled() is False
 
-    def test_the_cli_does_not_launch_the_app(self, capsys: pytest.CaptureFixture) -> None:
+    def test_the_cli_does_not_launch_the_app(
+        self, capsys: pytest.CaptureFixture, tmp_path: Path
+    ) -> None:
         # A settings change must not start a server as a side effect.
         from tapdesk.app import main
 
-        main(["--autostart", "on"])
+        main(["--config-dir", str(tmp_path), "--autostart", "on"])
         out = capsys.readouterr().out
         assert "listening" not in out.lower()
         assert "QR" not in out
