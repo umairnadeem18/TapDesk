@@ -110,6 +110,11 @@ Two defects ride along:
    `QR accepted` → `scanned: 192.168.2.110:8765 token=yes` → `connect …
    token=yes` → `dialing` → `socket open` → `sent 2 frames` → `PC: hello_ok` →
    `PC: auth_pending` (PC shows the approval dialog) → `status: Connected`.
+7. **Wipe the analyzer debt**: `flutter analyze` currently reports 18 issues
+   (mostly pre-existing unused imports / relative-import lint in tests, plus
+   `tool/probe_phone.dart`). Clean them all so analyze exits clean; decide
+   whether `tool/probe_phone.dart` stays (then fix its import to `package:`)
+   or gets deleted once pairing is proven fixed.
 
 ## Tool-chain notes for whoever runs the next build
 
