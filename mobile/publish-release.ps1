@@ -79,7 +79,11 @@ try {
     Say "release $tag already exists (id $($existing.id)) - reusing"
     $releaseId = $existing.id
   } else {
-    $body = Join-Path $env:TEMP 'gh_release.json'
+    # Deliberately not named "$body": PowerShell variable names are
+    # case-insensitive, and the parameter below is "$Body" — reusing the name
+    # here silently replaced the caller's release notes with this file path,
+    # which is what every note built by this script published as.
+    $notesFile = Join-Path $env:TEMP 'gh_release.json'
     # The body is escaped rather than interpolated raw: a newline in the notes
     # would otherwise produce a JSON document GitHub rejects, and the resulting
     # error message says nothing about the real cause.
@@ -97,10 +101,10 @@ try {
     # UTF-8 WITHOUT a BOM. PowerShell 5.1's Set-Content -Encoding UTF8 writes
     # one, and GitHub rejects the request as an invalid body - which is exactly
     # the silent failure this script had to work around.
-    [IO.File]::WriteAllText($body, $json, (New-Object Text.UTF8Encoding $false))
+    [IO.File]::WriteAllText($notesFile, $json, (New-Object Text.UTF8Encoding $false))
 
     $raw = Invoke-Gh "https://api.github.com/repos/$repo/releases" 'POST' `
-            @('Content-Type: application/json') $body
+            @('Content-Type: application/json') $notesFile
     if ($raw -match '"message"') { Say "release creation error: $raw" }
     $created = $raw | ConvertFrom-Json
     if (-not $created.id) { Say 'release creation failed'; exit 1 }
