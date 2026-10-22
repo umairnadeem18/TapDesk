@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'state/connection_controller.dart';
+import 'state/diagnostics.dart';
 import 'state/pairing_store.dart';
 import 'state/preview_mode.dart';
 import 'state/settings.dart';
@@ -17,6 +18,7 @@ import 'transport/pairing_payload.dart';
 import 'transport/session.dart';
 import 'transport/socket.dart';
 import 'ui/app_shell.dart';
+import 'ui/diagnostics_strip.dart';
 import 'ui/haptics.dart';
 import 'screens/pairing_screen.dart';
 
@@ -150,6 +152,7 @@ class _UiDelegate implements SessionDelegate {
 
   @override
   void onStatus(ConnectionInfo info) {
+    trace.add('status: ${info.status.label}${info.lastError != null ? " (${info.lastError})" : ""}');
     _controller.update(info);
     if (info.status == ConnectionStatus.reconnecting) {
       _controller.scheduleReconnect();
@@ -161,6 +164,7 @@ class _UiDelegate implements SessionDelegate {
   @override
   void onError(String message) {
     _error.value = message;
+    trace.add('error: $message');
     if (kDebugMode) debugPrint('[tapdesk] $message');
   }
 }
@@ -231,9 +235,16 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
     if (sink is! LiveEventSink) return;
 
     final remembered = store.devices.isEmpty ? null : store.devices.last;
-    if (remembered == null) return;
+    if (remembered == null) {
+      trace.add('no remembered computer');
+      return;
+    }
 
     _userDisconnected = false;
+    trace.add(
+      'remembered: ${remembered.host}:${remembered.port} '
+      "key=${remembered.fingerprint.substring(0, 12)}…",
+    );
     await sink.connectTo(
       PairingPayload(
         version: 1,
@@ -295,6 +306,10 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
     final sink = context.read<EventSink>();
     if (sink is LiveEventSink) {
       _userDisconnected = false;
+      trace.add(
+        'scanned: ${payload.ips.first}:${payload.port} '
+        "token=${payload.token.isEmpty ? 'no' : 'yes (43 chars)'}",
+      );
       // The token is passed straight through and never stored. It is
       // single-use; once the companion has spent it, the saved device key
       // takes over for good.

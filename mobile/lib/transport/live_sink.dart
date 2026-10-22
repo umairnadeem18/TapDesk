@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../state/connection_controller.dart';
+import '../state/diagnostics.dart';
 import '../state/settings.dart';
 import 'event_sink.dart';
 import 'key_store.dart';
@@ -72,72 +73,116 @@ class LiveEventSink extends EventSink {
   /// token is deliberately not persisted: it is single-use and short-lived,
   /// and there is no reason to write it to disk.
   Future<bool> connectTo(PairingPayload payload, {String? token}) async {
-    if (_connecting) return false;
-    _connecting = true;
-
-    // A scanned payload already carries its token, so making the caller pass
-    // it again was a trap - forgetting to produced "no device key and no
-    // pairing token" at the moment the user scanned a perfectly good code. An
-    // empty token means a remembered PC, where the saved device key is the
-    // credential instead.
-    final effectiveToken = token ?? (payload.token.isEmpty ? null : payload.token);
-
-    await _session?.disconnect();
-    _payload = payload;
-
-    // The PC's identity is its certificate, not its address: the same computer
-    // gets a new DHCP lease, and a different computer can be handed the old
-    // one. Keying storage by the fingerprint means pairing survives a network
-    // change and cannot be inherited by whatever appears at that IP later.
-    final pcId = payload.fingerprint;
-    final store = _SessionStore(keyStore: keyStore, pcId: pcId);
-    // Read up front rather than on first use: the handshake needs the key
-    // synchronously, and leaving this to a lazy read meant a key saved on a
-    // previous run was never sent - every app restart tried to pair again with
-    // a token the companion had long since spent.
-    store.seed(await keyStore.read(pcId));
-
-    final session = TapDeskSession(
-      factory: factory,
-      delegate: _Adapter(delegate, store, notifyListeners),
-      deviceName: deviceName,
-      host: payload.ips.first,
-      port: payload.port,
-      fingerprint: payload.fingerprint,
-    );
-
-    // The computer's settings belong to a specific connection. A report from
-    // the one being replaced must not be mistaken for the new one's.
-    session.onRemoteSettings = (message) => settings?.applyRemote(message);
-
-    try {
-      await session.connect(token: effectiveToken, deviceKey: store.deviceKey());
-    } catch (error) {
-      // A failed certificate pin lands here. It must be reported as itself:
-      // "could not connect" would leave the user retrying forever against a
-      // server that is never going to be the computer they paired with.
-      final reason = describeConnectFailure(error);
-      delegate.onError(reason);
-      // Reporting the drop as well as the reason is what keeps the retry loop
-      // alive. Without it the status stayed `connecting` with nobody left to
-      // schedule the next attempt, and the app sat there for good. The reason
-      // rides on the status too: the banner reads the snapshot alone, and
-      // without it the user watched the loop go by with never a word about
-      // what to do - the "connecting forever" report, in full.
-      delegate.onStatus(
-        ConnectionInfo(
-          status: ConnectionStatus.reconnecting,
-          pcName: payload.name,
-          lastError: reason,
-        ),
-      );
-      _connecting = false;
+    if (_connecting) {
+      trace.add('connect ignored: an attempt is already running');
       return false;
     }
+    _connecting = true;
+    trace.reset();
 
-    _session = session;
-    _connecting = false;
-    return true;
+    final effectiveToken = token ?? (payload.token.isEmpty ? null : payload.token);
+    trace.add(
+      'connect ${payload.ips.first}:${payload.port} '
+      "name='${payload.name}' token=${effectiveToken != null ? 'yes' : 'no'} "
+      "pcId fp=${payload.fingerprint.substring(0, 12)}…",
+    );
+
+    try {
+      await _session?.disconnect();
+      trace.add('previous session closed');
+      _payload = payload;
+
+      // The PC's identity is its certificate, not its address: the same
+      // computer gets a new DHCP lease, and a different computer can be
+      // handed the old one. Keying storage by the fingerprint means pairing
+      // survives a network change and cannot be inherited by whatever
+      // appears at that IP later.
+      final pcId = payload.fingerprint;
+      final store = _SessionStore(keyStore: keyStore, pcId: pcId);
+      // Read up front rather than on first use: the handshake needs the key
+      // synchronously, and leaving this to a lazy read meant a key saved on
+      // a previous run was never sent - every app restart tried to pair
+      // again with a token the companion had long since spent.
+      try {
+        store.seed(await keyStore.read(pcId));
+      } catch (error) {
+        // A secure-storage failure used to escape this method with
+        // `_connecting` still true, which silenced every later attempt -
+        // including the retry loop. Plant either null or the error's story,
+        // never an exception nobody sees.
+        trace.add('stored pairing unreadable ($error); continuing without it');
+        store.seed(null);
+      }
+      trace.add(
+        'saved device key: ${store.deviceKey() != null ? 'present' : 'none'}',
+      );
+
+      if (effectiveToken == null && store.deviceKey() == null) {
+        // Nothing to prove who we are. Standing this up in the past left a
+        // socket open with no hello - the server waited five seconds and
+        // gave up - and a status that never left 'not connected'. One line
+        // beats the whole silent dance.
+        trace.add('no pairing token and no saved key: scan the QR again');
+        delegate.onError(
+          'This pairing is no longer valid. Scan the QR code on the PC '
+          'to pair again.',
+        );
+        delegate.onStatus(
+          ConnectionInfo(
+            status: ConnectionStatus.failed,
+            pcName: payload.name,
+            lastError: 'forgotten pairing - scan again',
+          ),
+        );
+        return false;
+      }
+
+      final session = TapDeskSession(
+        factory: factory,
+        delegate: _Adapter(delegate, store, notifyListeners),
+        deviceName: deviceName,
+        host: payload.ips.first,
+        port: payload.port,
+        fingerprint: payload.fingerprint,
+      );
+
+      // The computer's settings belong to a specific connection. A report
+      // from the one being replaced must not be mistaken for the new one's.
+      session.onRemoteSettings = (message) => settings?.applyRemote(message);
+
+      try {
+        await session.connect(token: effectiveToken, deviceKey: store.deviceKey());
+      } catch (error) {
+        // A failed certificate pin lands here. It must be reported as
+        // itself: "could not connect" would leave the user retrying forever
+        // against a server that is never going to be the computer they
+        // paired with.
+        final reason = describeConnectFailure(error);
+        trace.add('connect failed: $reason ($error)');
+        delegate.onError(reason);
+        // Reporting the drop as well as the reason is what keeps the retry
+        // loop alive. Without it the status stayed `connecting` with nobody
+        // left to schedule the next attempt, and the app sat there for
+        // good. The reason rides on the status too: the banner reads the
+        // snapshot alone, and without it the user watched the loop go by
+        // with never a word about what to do - the "connecting forever"
+        // report, in full.
+        delegate.onStatus(
+          ConnectionInfo(
+            status: ConnectionStatus.reconnecting,
+            pcName: payload.name,
+            lastError: reason,
+          ),
+        );
+        return false;
+      }
+
+      _session = session;
+      trace.add('session started');
+      return true;
+    } finally {
+      _connecting = false;
+    }
   }
 
   /// Re-open the connection to the PC we are already paired with.

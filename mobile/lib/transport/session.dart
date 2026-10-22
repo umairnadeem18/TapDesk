@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 
 import '../state/connection_controller.dart';
+import '../state/diagnostics.dart';
 import 'event_sink.dart';
 import 'handshake.dart';
 import 'socket.dart';
@@ -90,6 +91,7 @@ class TapDeskSession extends EventSink {
   /// with, and the UI has to say so rather than reconnecting in a loop.
   Future<void> connect({String? token, String? deviceKey}) async {
     _publish(ConnectionStatus.connecting);
+    trace.add('dialing $host:$port (pinned to ${fingerprint.substring(0, 12)}…)');
 
     final socket = await factory.connect(
       host: host,
@@ -97,6 +99,7 @@ class TapDeskSession extends EventSink {
       fingerprint: fingerprint,
     );
     _socket = socket;
+    trace.add('socket open');
 
     _subscription = socket.messages.listen(
       _onMessage,
@@ -104,15 +107,29 @@ class TapDeskSession extends EventSink {
       onError: (Object error) => _onSocketClosed(),
     );
 
-    // The caller's key wins, so a freshly reconnected PC is preferred over a
-    // stale one that may since have been revoked.
-    final frames = _machine.startFrames(
-      deviceName: deviceName,
-      token: token,
-      deviceKey: deviceKey ?? delegate.deviceKey(),
-    );
-    for (final frame in frames) {
-      socket.send(frame);
+    try {
+      // The caller's key wins, so a freshly reconnected PC is preferred over
+      // a stale one that may since have been revoked.
+      final frames = _machine.startFrames(
+        deviceName: deviceName,
+        token: token,
+        deviceKey: deviceKey ?? delegate.deviceKey(),
+      );
+      for (final frame in frames) {
+        socket.send(frame);
+      }
+      // Milestone, not vanity: three nights were spent with a phone whose
+      // sockets opened and then went quiet, and without a line naming which
+      // side stopped talking there was no way to point at one.
+      trace.add('sent ${frames.length} frame(s) - hello${frames.length > 1 ? " + auth" : ""}');
+    } on Object {
+      // A machine or send failure right after opening used to leave the
+      // socket open with nothing ever sent - on the server that looks like a
+      // phone that dialled and said nothing, and it sat there for the full
+      // hello timeout. Never leave a half-handshaken socket behind.
+      await socket.close();
+      _socket = null;
+      rethrow;
     }
   }
 
@@ -138,6 +155,10 @@ class TapDeskSession extends EventSink {
   }
 
   void _onMessage(String raw) {
+    // The text of each frame is duplicated in the strip; truncation keeps a
+    // long frame from flooding it. This is how a reply that stalls (or
+    // arrives and is not understood) becomes visible on the phone itself.
+    trace.add('PC: ${raw.length > 80 ? "${raw.substring(0, 80)}…" : raw}');
     final outcome = isReady
         ? _machine.handleConnected(raw)
         : _machine.handle(raw);
@@ -172,6 +193,7 @@ class TapDeskSession extends EventSink {
 
   void _onSocketClosed() {
     if (_disposed) return;
+    trace.add('socket closed by PC (status was ${_machine.status.label})');
     // Losing a healthy connection is the common case - a phone leaving Wi-Fi
     // range, a laptop sleeping - and it should reconnect rather than send the
     // user back to the pairing screen. The machine decides, so its status and

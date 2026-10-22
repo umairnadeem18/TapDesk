@@ -130,6 +130,11 @@ class PairingServer:
     async def _handle(self, connection: ServerConnection) -> None:
         state = ConnectionState(peer=str(connection.remote_address))
         self._states[connection] = state
+        log.info(
+            "connection accepted from %s (open: %s peers)",
+            state.peer,
+            len(self._states),
+        )
         try:
             await self._handshake(connection, state)
             if state.authenticated:
@@ -145,6 +150,7 @@ class PairingServer:
         finally:
             self._release_input(state)
             self._states.pop(connection, None)
+            log.info("connection finished for %s", state.peer)
 
     async def _handshake(
         self, connection: ServerConnection, state: ConnectionState
@@ -154,6 +160,14 @@ class PairingServer:
                 connection.recv(), timeout=HELLO_TIMEOUT_SECONDS
             )
         except asyncio.TimeoutError:
+            # A socket the TLS layer accepted but from which not one byte of
+            # hello ever arrived. Naming the peer is what makes seven rapid
+            # anonymous opens diagnosable at a glance.
+            log.info(
+                "no hello from %s within %s seconds; closing",
+                state.peer,
+                HELLO_TIMEOUT_SECONDS,
+            )
             await self._close(connection, p.E_MALFORMED)
             return
 

@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../state/diagnostics.dart';
 import 'fingerprint.dart';
 
 /// Why a connection could not be established.
@@ -90,7 +91,10 @@ class PinnedSocket implements TapDeskSocket {
     // them is worth the user going to look at the screen.
     var rejected = false;
 
-    final HttpClient client = _pinningClient(fingerprint, () => rejected = true);
+    final HttpClient client = _pinningClient(fingerprint, () {
+      rejected = true;
+      trace.add('PC offered a certificate that does not match the QR - rejecting');
+    });
 
     // self-signed: the CA check is meaningless here and is replaced by the
     // fingerprint comparison inside badCertificateCallback.
@@ -107,6 +111,11 @@ class PinnedSocket implements TapDeskSocket {
       await channel.ready;
     } on Object {
       client.close(force: true);
+      trace.add(
+        rejected
+          ? 'certificate did NOT match the QR fingerprint - refusing it'
+          : 'connecting did not finish (timeout or network refused)',
+      );
       throw HandshakeException(
         rejected ? HandshakeFailure.fingerprintMismatch : HandshakeFailure.timedOut,
       );

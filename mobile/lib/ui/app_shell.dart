@@ -13,6 +13,7 @@ import '../state/preview_mode.dart';
 import '../state/settings.dart';
 import '../theme/tokens.dart';
 import 'connection_indicators.dart';
+import 'diagnostics_strip.dart';
 import 'haptics.dart';
 
 /// The app shell: app bar, connection banner, three tabs.
@@ -90,6 +91,7 @@ class _AppShellState extends State<AppShell> {
             children: [
               if (widget.preview) const PreviewBanner(),
               ConnectionBanner(status: info.status, error: info.lastError),
+              const DiagnosticsStrip(),
               _TabBar(
                 tabs: _tabs,
                 index: _index,

@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
+import '../state/diagnostics.dart';
 import '../state/pairing_store.dart';
 import '../state/preview_mode.dart';
 import '../theme/tokens.dart';
 import '../transport/event_sink.dart';
 import '../transport/pairing_payload.dart';
+import '../ui/diagnostics_strip.dart';
 import '../ui/haptics.dart';
 
 /// How the pairing screen was left, and what the caller should do next.
@@ -63,6 +65,7 @@ class _PairingScreenState extends State<PairingScreen> {
 
       final payload = PairingPayload.tryParseDeepLink(raw);
       if (payload == null) {
+        trace.add('QR rejected: not a TapDesk code (${raw.length} chars)');
         _fail('That QR code is not a TapDesk pairing code. '
             'Scan the code shown in the desktop app, or enter the details by hand.');
         return;
@@ -70,6 +73,7 @@ class _PairingScreenState extends State<PairingScreen> {
 
       _busy = true;
       await _scanner?.stop();
+      trace.add('QR accepted: TapDesk code for ${payload.name}');
       if (!mounted) return;
 
       await context.read<PairingStore>().remember(payload);
@@ -116,6 +120,7 @@ class _PairingScreenState extends State<PairingScreen> {
             // and the plan requires visual sign-off on the design before any
             // transport work. See PreviewMode.
             if (context.watch<PreviewMode>().allowed) _PreviewEntry(),
+            const DiagnosticsStrip(),
             if (_error != null) _ErrorStrip(message: _error!),
           ],
         ),
