@@ -538,6 +538,10 @@ Treat beta.4 as the build to verify them.
 
 ### The beta.4 "connecting forever" report - cause and fixes (2026-10-23)
 
+> Superseded in part later this same night - see "The companion kept dying
+> (2026-10-23, later)" below for the mechanism that explains why every
+> verification in this section was dead again within the hour.
+
 **Reported after the settings build:** the QR would seemingly not pair; the app
 said "connecting" and the loop never ended. Two things were true at once, and
 only one of them was the phone's fault.
@@ -583,6 +587,46 @@ a port clash with the newly running companion, not a regression - they bind
 
 Published v1.0.0-beta.5 with both fixes; the PC side is unchanged, so the
 beta.4 installer remains current.
+
+### The companion kept dying (2026-10-23, later)
+
+Pattern of the night: the companion was verified listening, the user then
+tested the phone minutes later and nothing answered, the process was gone
+again. Nobody had quit it; the event log shows no crash - checked after the
+third recurrence.
+
+**The mechanism is on this machine's rap sheet already:** processes started by
+a tool or agent session are killed when that session cleans up. The same
+behavior that lost 898 MB of a Flutter download during Phase 0 was killing the
+companion - every restart of it this session ran as a child of an agent
+shell, and it died the moment that shell's session ended, regardless of which
+user launched it *through* it. Start-Process does not escape this; the
+process tree is what gets reaped.
+
+**Fix in the workflow:** launch it detached from any session -
+`explorer.exe <path to TapDesk.exe>` makes Explorer the parent, outside the
+agent's tree. Verified: parent PID is `explorer.exe`, and it survives the
+session that started it. Anyone else debugging "the phone can't connect" on
+this machine should first check `netstat -ano | findstr 8765`, and should
+start the companion detached if it is missing.
+
+**Two companion improvements shipped alongside**, replacing the installed exe
+in place (no uninstall, so the firewall rule, config and device list survive):
+
+1. **A flight recorder.** The windowed exe has no console, so every
+   connection attempt came and went unrecorded - the reason each diagnosis
+   today took a file-by-file hunt. `~/.tapdesk/companion.log` now receives
+   INFO+ for every run, headless included. The first read of the new log
+   already shows the two probes arriving as visible lines.
+2. **A pairing request wakes the window.** The Allow prompt is shown on the
+   companion window; a window closed to the tray got the prompt anyway but
+   nobody knew. `showNormal(); raise_(); activateWindow()` now run before the
+   question, so a scan from the phone makes the PC show the window with
+   "Allow this phone?" on it.
+
+207 Python tests pass. The 196-byte mystery in the first log read - "Task was
+destroyed but it is pending" entries timestamped while the previous exe died
+- is the taskkill shutdown, not a defect in the new build.
 
 
 ### Remaining work, in order

@@ -333,6 +333,14 @@ class Companion:
         def show() -> None:
             from PySide6.QtWidgets import QMessageBox
 
+            # A window closed to the tray must not receive an invisible
+            # prompt: the phone is already waiting, the user is the reason
+            # this request is slowing down, so the window comes back to the
+            # front with the question in it.
+            self._window.showNormal()
+            self._window.raise_()
+            self._window.activateWindow()
+
             box = QMessageBox(self._window)
             box.setWindowTitle("Allow this phone?")
             box.setText(f"Allow <b>{device_name}</b> to control this computer?")
@@ -854,6 +862,21 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     )
+
+    # A windowed exe has no console; without this every connection attempt,
+    # pairing prompt and refusal happened and then evaporated. The log lives
+    # beside the certificate, so checking whether a phone is reaching this PC
+    # is one file read instead of an unreproducible guess. Attached for every
+    # run - headless included: the cross-implementation tests each pass their
+    # own config-dir, so their logs land beside the certificates they use.
+    args.config_dir.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.FileHandler(
+        args.config_dir / "companion.log", encoding="utf-8"
+    )
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    )
+    logging.getLogger().addHandler(file_handler)
 
     companion = Companion(
         config_dir=args.config_dir, port=args.port, headless=args.headless
