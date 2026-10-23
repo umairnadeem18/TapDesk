@@ -22,29 +22,29 @@
  */
 export const RELEASES = {
   android: {
-    version: "v1.0.0-beta.8",
-    size: "25.0 MB",
+    version: "v1.0.0-beta.9",
+    size: "24.8 MB",
     minAndroid: "Android 8.0 (API 26)",
-    // SHA-256 of TapDesk-v1.0.0-beta.8-arm64-v8a.apk
+    // SHA-256 of TapDesk-v1.0.0-beta.9-arm64-v8a.apk
     sha256:
-      "a5d3d9e2dd5565740ed1a28665b4b54164ae0bc5c4493149c9e0c2d6d90795f1",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-v1.0.0-beta.8-arm64-v8a.apk",
+      "95160da18034622dffdb7022ea1432663eee762ac562b2f3261f7f73cff6fc24",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-v1.0.0-beta.9-arm64-v8a.apk",
     variants: [
       {
         id: "arm64-v8a",
         label: "Most phones (2017 and newer)",
-        size: "25.0 MB",
+        size: "24.8 MB",
         sha256:
-          "a5d3d9e2dd5565740ed1a28665b4b54164ae0bc5c4493149c9e0c2d6d90795f1",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-v1.0.0-beta.8-arm64-v8a.apk",
+          "95160da18034622dffdb7022ea1432663eee762ac562b2f3261f7f73cff6fc24",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-v1.0.0-beta.9-arm64-v8a.apk",
       },
       {
         id: "armeabi-v7a",
         label: "Older or budget phones",
-        size: "21.1 MB",
+        size: "20.8 MB",
         sha256:
-          "73d5321cee1de0123dc7819660a2c50a52812bed57c75b17e18baf879b5c6d5d",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-v1.0.0-beta.8-armeabi-v7a.apk",
+          "bb0f3c8fde7429901587bb3a13c1afc2582559d7b09c27b634eb2d068b05e7f3",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-v1.0.0-beta.9-armeabi-v7a.apk",
       },
     ],
   },
@@ -60,7 +60,7 @@ export const RELEASES = {
     // keeps ~/.tapdesk (certificate, devices, firewall rule) intact.
     sha256:
       "1a10eb50ab6628438e275c1280f6ec7a0f2253c5a08dfde5604457ef0280ea5c",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-1.0.0-setup.exe",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-1.0.0-setup.exe",
   },
 };
 
