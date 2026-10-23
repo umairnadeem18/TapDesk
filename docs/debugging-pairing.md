@@ -149,6 +149,16 @@ its approval dialog, then Connected.
 callback scenario (hard because the camera plugin must be stubbed); the
 remembered-reconnect path stays covered by the existing no-credential refusal.
 
+## Closing the log (2026-10-23)
+
+Pairing was first proven in beta.8 (device `d_122677006c20674e`, paired 20:48).
+Settings' spinner never reaching its controls turned out to be the upstream
+shared_preferences_android 2.5.0 R8/JNI release-mode break (see above), fixed
+by pinning 2.4.28 in beta.9 and made unhangable at the loader level everywhere.
+The product ships as **v1.0.0**: the trace strip keeps a minimise control
+(persisted), the release pipeline marks only beta/rc/alpha tags as pre-release,
+and the website drops every "beta" string.
+
 ## Tool-chain notes for whoever runs the next build
 
 - `flutter test` needs TapDesk.exe killed first (cross-implementation tests bind

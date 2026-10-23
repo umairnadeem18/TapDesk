@@ -32,8 +32,8 @@ export default function TermsPage() {
                 "TapDesk is licensed for your personal or internal organisational use. You may install it on any device you are authorised to administer. You may not resell, sublicense, or redistribute modified builds of the software.",
               ],
               [
-                "3. Beta software",
-                "Current releases are beta software provided as-is. Features may change, bugs may exist, and builds may be withdrawn or replaced at any time. We recommend testing on a non-critical machine before relying on TapDesk for a live presentation.",
+                "3. Software status",
+                "Current releases are provided as-is. Features may be refined, and every defect reported by the connection trace on the phone or in the computer's log is addressed in updates. We recommend testing on a non-critical machine before relying on TapDesk for a live presentation.",
               ],
               [
                 "4. Acceptable use",

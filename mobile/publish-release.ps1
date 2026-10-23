@@ -88,6 +88,11 @@ try {
     # would otherwise produce a JSON document GitHub rejects, and the resulting
     # error message says nothing about the real cause.
     $escaped = $Body -replace '\\', '\\\\' -replace '"', '\"' -replace "`r`n", '\n' -replace "`n", '\n'
+    # A tag is a pre-release when its name says so, and the stable v1.0.0 must
+    # not: GitHub's "latest" link points at the newest non-prerelease, so a
+    # final release accidentally marked pre-release would be invisible to
+    # exactly the audience that searches for "the current version".
+    $isPrerelease = if ($tag -match 'beta|rc|alpha') { 'true' } else { 'false' }
     $json = @"
 {
   "tag_name": "$tag",
@@ -95,7 +100,7 @@ try {
   "name": "TapDesk $tag",
   "body": "$escaped",
   "draft": false,
-  "prerelease": true
+  "prerelease": $isPrerelease
 }
 "@
     # UTF-8 WITHOUT a BOM. PowerShell 5.1's Set-Content -Encoding UTF8 writes

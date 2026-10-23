@@ -363,7 +363,7 @@ export function DownloadCards() {
             {modal === "desktop" ? (
               <p className="mt-6 rounded-2xl bg-surface px-5 py-4 text-sm leading-relaxed text-muted">
                 Windows SmartScreen may warn you that the publisher is unknown
-                while TapDesk is in beta and unsigned. Choose{" "}
+                because TapDesk is self-distributed and not code-signed. Choose{" "}
                 <strong className="text-ink">More info → Run anyway</strong>, and
                 verify the SHA-256 checksum shown on the download card.
               </p>

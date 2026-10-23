@@ -3,10 +3,10 @@
  *
  * Two rules that are easy to break by accident:
  *
- * 1. The URL pins the tag rather than using /releases/latest. latest EXCLUDES
- *    prereleases, so a beta link built on it 404s - which is exactly what
- *    happened the first time. Pinning the tag also means the published SHA-256
- *    always belongs to the file being downloaded.
+ * 1. The URL pins the tag rather than using /releases/latest. Pinning means
+ *    the published SHA-256 always belongs to the file being downloaded, and a
+ *    pre-release never masquerades as "the current version" - which is exactly
+ *    what a /latest link risks.
  *
  *    Every build changes these values, and a stale checksum is worse than no
  *    checksum: a user verifying their download would be told their file was
@@ -22,45 +22,42 @@
  */
 export const RELEASES = {
   android: {
-    version: "v1.0.0-beta.9",
+    version: "v1.0.0",
     size: "24.8 MB",
     minAndroid: "Android 8.0 (API 26)",
-    // SHA-256 of TapDesk-v1.0.0-beta.9-arm64-v8a.apk
-    sha256:
-      "95160da18034622dffdb7022ea1432663eee762ac562b2f3261f7f73cff6fc24",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-v1.0.0-beta.9-arm64-v8a.apk",
+    // SHA-256 of TapDesk-v1.0.0-arm64-v8a.apk
+    sha256: "bef98eb428f7dca1e4f286d9bf7ed60a756b6c7a990dc7a95f94075ebabc0194",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0/TapDesk-v1.0.0-arm64-v8a.apk",
     variants: [
       {
         id: "arm64-v8a",
         label: "Most phones (2017 and newer)",
         size: "24.8 MB",
-        sha256:
-          "95160da18034622dffdb7022ea1432663eee762ac562b2f3261f7f73cff6fc24",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-v1.0.0-beta.9-arm64-v8a.apk",
+        sha256: "bef98eb428f7dca1e4f286d9bf7ed60a756b6c7a990dc7a95f94075ebabc0194",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0/TapDesk-v1.0.0-arm64-v8a.apk",
       },
       {
         id: "armeabi-v7a",
         label: "Older or budget phones",
         size: "20.8 MB",
-        sha256:
-          "bb0f3c8fde7429901587bb3a13c1afc2582559d7b09c27b634eb2d068b05e7f3",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-v1.0.0-beta.9-armeabi-v7a.apk",
+        sha256: "a2b663580c77364ee5a8ed97c1c7b99ae6f1e023d0ad0ae2f32aa69ae2e605ce",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0/TapDesk-v1.0.0-armeabi-v7a.apk",
       },
     ],
   },
   windows: {
-    version: "v1.0.0-beta.4",
+    version: "v1.0.0",
     size: "58.7 MB",
     minWindows: "Windows 10 / 11 (64-bit)",
-    // SHA-256 of TapDesk-1.0.0-setup.exe, built for beta.4.
+    // SHA-256 of TapDesk-1.0.0-setup.exe.
     //
-    // The PC companion itself has been updated in place on this machine and
-    // shipped inside beta.6's installer, so beta.7 and beta.8 reuse those same bytes:
-    // the fix it ships is entirely phone-side, and a re-run of the installer
+    // The PC companion has not needed a rebuild since it grew its connection
+    // logging; the fixes that followed live entirely in the phone app, so the
+    // same installer bytes ride along with each phone release. A re-install
     // keeps ~/.tapdesk (certificate, devices, firewall rule) intact.
     sha256:
       "1a10eb50ab6628438e275c1280f6ec7a0f2253c5a08dfde5604457ef0280ea5c",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.9/TapDesk-1.0.0-setup.exe",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0/TapDesk-1.0.0-setup.exe",
   },
 };
 
@@ -210,7 +207,7 @@ export const FAQ = [
   },
   {
     q: "Will Windows SmartScreen warn me about the installer?",
-    a: "Possibly, if the build is not yet code-signed. TapDesk is unsigned in the early beta, so SmartScreen will show an 'unrecognised app' warning. Click 'More info' then 'Run anyway'. We publish a SHA-256 checksum on the download page so you can verify the file you received.",
+    a: "Possibly, if the build is not yet code-signed. TapDesk is self-distributed and unsigned, so SmartScreen will show an 'unrecognised app' warning. Click 'More info' then 'Run anyway'. We publish a SHA-256 checksum on the download page so you can verify the file you received.",
   },
   {
     q: "Which platforms are supported?",
