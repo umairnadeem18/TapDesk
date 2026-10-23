@@ -14,6 +14,13 @@ import '../theme/tokens.dart';
 class DiagnosticsStrip extends StatelessWidget {
   const DiagnosticsStrip({super.key});
 
+  /// The most the strip may ever take. A capped strip is exactly what makes
+  /// the pairing screen unusable: the scanner area above it shares the same
+  /// column, so an uncapped strip of thrown stack traces can push the camera
+  /// (and everything else a user needs to tap) clean off the screen - which
+  /// is what one fresh install did before this cap existed.
+  static const double _maxHeight = 132;
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -25,18 +32,25 @@ class DiagnosticsStrip extends StatelessWidget {
           width: double.infinity,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           padding: const EdgeInsets.all(10),
+          constraints: const BoxConstraints(maxHeight: _maxHeight),
           decoration: BoxDecoration(
             color: TapDeskColors.surface,
             border: Border.all(color: TapDeskColors.divider),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(
-            shown.isEmpty ? 'no connection activity yet' : shown.join('\n'),
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.4,
-              fontFamily: TapDeskText.mono,
-              color: TapDeskColors.textMuted,
+          child: SingleChildScrollView(
+            // Newest lines at the bottom, and the view pinned to them: a
+            // flood of exceptions scrolls the ones that matter off-screen
+            // unless the box itself follows.
+            reverse: true,
+            child: Text(
+              shown.isEmpty ? 'no connection activity yet' : shown.join('\n'),
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.4,
+                fontFamily: TapDeskText.mono,
+                color: TapDeskColors.textMuted,
+              ),
             ),
           ),
         );

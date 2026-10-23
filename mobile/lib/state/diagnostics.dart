@@ -29,16 +29,32 @@ class DiagnosticsTrace extends ChangeNotifier {
 
   final List<String> _lines = <String>[];
 
+  String? _lastRaw;
+  int _repeat = 0;
+
   /// The kept lines, oldest first, most recent last.
   List<String> get lines => List.unmodifiable(_lines);
 
   /// Record [line] with a timestamp, keeping only the newest [_maxLines].
   ///
+  /// A failing platform channel can throw faster than any list can hold, and
+  /// the same stack repeated forty times tells nobody anything new. Identical
+  /// consecutive lines collapse into one entry that counts its repeats.
+  ///
   /// [debugPrint] keeps the same story for whoever runs `flutter run`; the
   /// strip on screen is the one that reaches the user with no terminal.
   void add(String line) {
-    final stamp = DateTime.now().toIso8601String();
-    _lines.add('${stamp.substring(11, 23)}  $line');
+    final stamp = DateTime.now().toIso8601String().substring(11, 23);
+    if (_lines.isNotEmpty && _lastRaw == line) {
+      _repeat++;
+      _lines[_lines.length - 1] = '$stamp  $line (×$_repeat)';
+      notifyListeners();
+      if (kDebugMode) debugPrint('[tapdesk] $line');
+      return;
+    }
+    _lastRaw = line;
+    _repeat = 1;
+    _lines.add('$stamp  $line');
     while (_lines.length > _maxLines) {
       _lines.removeAt(0);
     }
@@ -50,6 +66,8 @@ class DiagnosticsTrace extends ChangeNotifier {
   /// strip shows the current attempt rather than an archaeology dig.
   void reset() {
     _lines.clear();
+    _lastRaw = null;
+    _repeat = 0;
     notifyListeners();
   }
 }
