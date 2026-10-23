@@ -22,29 +22,29 @@
  */
 export const RELEASES = {
   android: {
-    version: "v1.0.0-beta.7",
+    version: "v1.0.0-beta.8",
     size: "25.0 MB",
     minAndroid: "Android 8.0 (API 26)",
-    // SHA-256 of TapDesk-v1.0.0-beta.7-arm64-v8a.apk
+    // SHA-256 of TapDesk-v1.0.0-beta.8-arm64-v8a.apk
     sha256:
-      "da1d4a438d071a94d2fb8cf50e8b7d9a3a4ff2e4606591c1b1fbd4c2f644a0bb",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.7/TapDesk-v1.0.0-beta.7-arm64-v8a.apk",
+      "a5d3d9e2dd5565740ed1a28665b4b54164ae0bc5c4493149c9e0c2d6d90795f1",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-v1.0.0-beta.8-arm64-v8a.apk",
     variants: [
       {
         id: "arm64-v8a",
         label: "Most phones (2017 and newer)",
         size: "25.0 MB",
         sha256:
-          "da1d4a438d071a94d2fb8cf50e8b7d9a3a4ff2e4606591c1b1fbd4c2f644a0bb",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.7/TapDesk-v1.0.0-beta.7-arm64-v8a.apk",
+          "a5d3d9e2dd5565740ed1a28665b4b54164ae0bc5c4493149c9e0c2d6d90795f1",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-v1.0.0-beta.8-arm64-v8a.apk",
       },
       {
         id: "armeabi-v7a",
         label: "Older or budget phones",
         size: "21.1 MB",
         sha256:
-          "e05be97a918ef9967f9e1cc2ee93800341a5b556458e5d2be6b9c8bcfc0d8c30",
-        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.7/TapDesk-v1.0.0-beta.7-armeabi-v7a.apk",
+          "73d5321cee1de0123dc7819660a2c50a52812bed57c75b17e18baf879b5c6d5d",
+        url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-v1.0.0-beta.8-armeabi-v7a.apk",
       },
     ],
   },
@@ -55,12 +55,12 @@ export const RELEASES = {
     // SHA-256 of TapDesk-1.0.0-setup.exe, built for beta.4.
     //
     // The PC companion itself has been updated in place on this machine and
-    // shipped inside beta.6's installer, so beta.7 reuses those same bytes:
+    // shipped inside beta.6's installer, so beta.7 and beta.8 reuse those same bytes:
     // the fix it ships is entirely phone-side, and a re-run of the installer
     // keeps ~/.tapdesk (certificate, devices, firewall rule) intact.
     sha256:
       "1a10eb50ab6628438e275c1280f6ec7a0f2253c5a08dfde5604457ef0280ea5c",
-    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.7/TapDesk-1.0.0-setup.exe",
+    url: "https://github.com/umairnadeem18/TapDesk/releases/download/v1.0.0-beta.8/TapDesk-1.0.0-setup.exe",
   },
 };
 
