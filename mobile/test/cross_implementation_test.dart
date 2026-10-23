@@ -1,4 +1,4 @@
-/// Cross-implementation test: the real phone transport against the real companion.
+﻿/// Cross-implementation test: the real phone transport against the real companion.
 ///
 /// Every other test checks one implementation against its own expectations. That
 /// is not enough: a phone that speaks a protocol the companion does not
@@ -42,10 +42,10 @@ final Directory approvingConfigDir = Directory(
 );
 
 /// The test fixture that approves pairing, while it is running.
-_Child? approving;
+_Child? _approving;
 
 /// The strict companion the shipped entry point starts.
-_Child? companion;
+_Child? _companion;
 
 bool get built => python.existsSync();
 
@@ -143,7 +143,7 @@ Future<void> _startCompanion(int port) async {
   // measure how long the *wait* took rather than when the companion started,
   // and a previous test's link would sometimes fall on the right side of it.
   final launchedAt = DateTime.now();
-  companion = await _Child.start(
+  _companion = await _Child.start(
     python.path,
     [
       '-m',
@@ -156,7 +156,7 @@ Future<void> _startCompanion(int port) async {
     ],
     workingDirectory: '../companion',
   );
-  await _waitForPort(port, child: companion!);
+  await _waitForPort(port, child: _companion!);
   await _awaitFreshLink(configDir, launchedAt);
 }
 
@@ -167,7 +167,7 @@ Future<void> _startCompanion(int port) async {
 /// withhold, and it should not be one mistyped argument away from every user.
 Future<void> _startApprovingCompanion() async {
   final launchedAt = DateTime.now();
-  approving = await _Child.start(
+  _approving = await _Child.start(
     python.path,
     [
       'tests/approve_server.py',
@@ -178,7 +178,7 @@ Future<void> _startApprovingCompanion() async {
     ],
     workingDirectory: '../companion',
   );
-  await _waitForPort(approvingPort, child: approving!, label: 'approving fixture');
+  await _waitForPort(approvingPort, child: _approving!, label: 'approving fixture');
   await _awaitFreshLink(approvingConfigDir, launchedAt);
 }
 
@@ -338,10 +338,10 @@ void main() {
   });
 
   tearDown(() {
-    companion?.process.kill(ProcessSignal.sigterm);
-    companion = null;
-    approving?.process.kill(ProcessSignal.sigterm);
-    approving = null;
+    _companion?.process.kill(ProcessSignal.sigterm);
+    _companion = null;
+    _approving?.process.kill(ProcessSignal.sigterm);
+    _approving = null;
   });
 
   tearDownAll(() {
@@ -533,7 +533,7 @@ test('a phone that scans a code gets nothing without approval', () async {
       SlideEvent(SlideAction.next),
       SlideEvent(SlideAction.prev),
       SlideEvent(SlideAction.blank),
-      TextEvent('السلام'),
+      TextEvent('Ø§Ù„Ø³Ù„Ø§Ù…'),
       TextEvent('hello world'),
       ClickEvent(MouseButton.left, ClickAction.click),
       ClickEvent(MouseButton.right, ClickAction.double),

@@ -4,7 +4,7 @@ publish_to: 'none'
 
 # Shown in the app store listing and in the website's download card.
 # Kept in step with docs/protocol.md; bump only with the protocol.
-version: 1.0.0+6
+version: 1.0.0+7
 
 environment:
   sdk: ^3.13.5

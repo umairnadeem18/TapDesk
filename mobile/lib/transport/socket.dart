@@ -155,8 +155,8 @@ class PinnedSocket implements TapDeskSocket {
   }
 
   /// The channel, typed rather than dynamic: declaring it loosely is what let a
-/// Stream<dynamic> be assigned to a StreamSubscription<String> without the
-/// analyzer noticing.
+  /// `Stream<dynamic>` be assigned to a `StreamSubscription<String>` without the
+  /// analyzer noticing.
 final WebSocketChannel _channel;
   final StreamController<String> _incoming = StreamController<String>();
   StreamSubscription<String>? _subscription;

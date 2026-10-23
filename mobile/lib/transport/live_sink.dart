@@ -227,7 +227,12 @@ class LiveEventSink extends EventSink {
   @override
   bool send(TapDeskEvent event) => _session?.send(event) ?? false;
 
+  @override
   Future<void> dispose() async {
+    // The notifier must stop notifying before any await: the session's last
+    // moments can still poke this sink, and after dispose that must be a
+    // safe no-op rather than a change-notification into thin air.
+    super.dispose();
     await _session?.dispose();
     _session = null;
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -58,6 +60,10 @@ class _PairingScreenState extends State<PairingScreen> {
   Future<void> _onDetect(BarcodeCapture capture) async {
     // Guard against the scanner firing the same QR on several frames.
     if (_busy) return;
+    // What the continuation needs, captured before any await: the pairing
+    // handoff must never depend on the scanner screen still being mounted.
+    final store = context.read<PairingStore>();
+    final callback = widget.onPaired;
 
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
@@ -74,13 +80,34 @@ class _PairingScreenState extends State<PairingScreen> {
       _busy = true;
       await _scanner?.stop();
       trace.add('QR accepted: TapDesk code for ${payload.name}');
-      if (!mounted) return;
 
-      await context.read<PairingStore>().remember(payload);
-      if (!mounted) return;
-
-      await Haptics.confirm();
-      widget.onPaired?.call(payload);
+      // Everything below hands the pairing over to the root. It must not
+      // depend on this screen staying alive: remember() notifies the store,
+      // the store rebuilds the root *while this method is still awaiting
+      // remember's own storage write*, and the root swaps this scanner
+      // screen out for the controls screen. Five days of "not connected"
+      // came from that exact moment: the old code checked `mounted` after
+      // remember, found the screen already replaced, and returned - the
+      // pairing callback was never called, and not one byte left the
+      // phone. The store and callback captured above are plain object
+      // references that stay valid after this State is disposed.
+      try {
+        await store.remember(payload);
+      } catch (error) {
+        // Not fatal: the home screen just loses its shortcut. The pairing
+        // itself carries everything it needs in the payload.
+        trace.add('remember failed (continuing anyway): $error');
+      }
+      unawaited(Haptics.confirm());
+      trace.add('handing pairing to the app');
+      if (callback == null) {
+        // Nowhere to hand the pairing to. Better a stopped camera the user
+        // can retry from than a spinner that hangs over it forever.
+        trace.add('no pairing callback wired - cannot continue');
+        if (mounted) setState(() => _busy = false);
+        return;
+      }
+      callback(payload);
       return;
     }
   }

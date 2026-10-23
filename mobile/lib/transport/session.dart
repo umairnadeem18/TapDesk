@@ -225,7 +225,9 @@ class TapDeskSession extends EventSink {
     );
   }
 
+  @override
   Future<void> dispose() async {
+    super.dispose();
     _disposed = true;
     await _teardown(1001, 'app closed');
   }

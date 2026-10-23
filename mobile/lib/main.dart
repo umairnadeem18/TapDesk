@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'state/connection_controller.dart';
 import 'state/diagnostics.dart';
@@ -18,12 +17,22 @@ import 'transport/pairing_payload.dart';
 import 'transport/session.dart';
 import 'transport/socket.dart';
 import 'ui/app_shell.dart';
-import 'ui/diagnostics_strip.dart';
 import 'ui/haptics.dart';
 import 'screens/pairing_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // A release build with no terminal eats every uncaught exception. After
+  // five days of a silence nobody could see past, that is not tolerable:
+  // framework and async errors land on the phone's own trace strip.
+  FlutterError.onError = (details) {
+    trace.add('flutter error: ${details.exception}');
+    FlutterError.presentError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    trace.add('async error: $error');
+    return false;
+  };
   SystemChrome.setSystemUIOverlayStyle(TapDeskTheme.systemOverlay);
   // Portrait only: the three tabs are laid out for a hand-held phone, and
   // rotating mid-lecture should not reflow the controls under the thumb.
@@ -47,8 +56,7 @@ class TapDeskApp extends StatefulWidget {
 
 class _TapDeskAppState extends State<TapDeskApp> {
   late final ConnectionController _controller;
-  late final EventSink _sink;
-  late final AppSettings _settings;
+  late final EventSink _sink;  late final AppSettings _settings;
   final ValueNotifier<String?> _error = ValueNotifier<String?>(null);
 
   @override
@@ -71,7 +79,7 @@ class _TapDeskAppState extends State<TapDeskApp> {
     // Wiring the connection up where the screen is constructed would mean the
     // settings only worked the first time they were opened.
     if (_sink is LiveEventSink) {
-      (_sink as LiveEventSink).attachSettings(_settings);
+      _sink.attachSettings(_settings);
     }
 
     // Haptics is the one setting with a consumer that is not a widget. Keeping
@@ -303,18 +311,22 @@ class _RootState extends State<_Root> with WidgetsBindingObserver {
   }
 
   Future<void> _onPaired(PairingPayload payload) async {
+    _userDisconnected = false;
+    trace.add(
+      'scanned: ${payload.ips.first}:${payload.port} '
+      "token=${payload.token.isEmpty ? 'no' : 'yes (43 chars)'}",
+    );
     final sink = context.read<EventSink>();
-    if (sink is LiveEventSink) {
-      _userDisconnected = false;
-      trace.add(
-        'scanned: ${payload.ips.first}:${payload.port} '
-        "token=${payload.token.isEmpty ? 'no' : 'yes (43 chars)'}",
-      );
-      // The token is passed straight through and never stored. It is
-      // single-use; once the companion has spent it, the saved device key
-      // takes over for good.
-      await sink.connectTo(payload, token: payload.token);
+    if (sink is! LiveEventSink) {
+      // Unreachable in the shipped wiring, but a silent `if` here would make
+      // a wrong injection indistinguishable from a pairing that never ran.
+      trace.add('event sink is ${sink.runtimeType}, not the live one');
+      return;
     }
+    // The token is passed straight through and never stored. It is
+    // single-use; once the companion has spent it, the saved device key
+    // takes over for good.
+    await sink.connectTo(payload, token: payload.token);
     if (!mounted) return;
     setState(() => _onHome = false);
   }

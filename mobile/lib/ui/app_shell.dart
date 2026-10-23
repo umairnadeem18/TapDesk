@@ -14,7 +14,6 @@ import '../state/settings.dart';
 import '../theme/tokens.dart';
 import 'connection_indicators.dart';
 import 'diagnostics_strip.dart';
-import 'haptics.dart';
 
 /// The app shell: app bar, connection banner, three tabs.
 ///

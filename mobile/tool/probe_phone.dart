@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import '../lib/transport/socket.dart';
+import 'package:tapdesk_mobile/transport/socket.dart';
 
 Future<void> main(List<String> args) async {
   final host = args.isNotEmpty ? args[0] : '192.168.2.110';

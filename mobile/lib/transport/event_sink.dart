@@ -48,7 +48,7 @@ abstract class EventSink extends ChangeNotifier {
 /// and asserted in tests, and it makes the eventual transport swap a
 /// one-line change in `main.dart`.
 class RecordingEventSink extends EventSink {
-  RecordingEventSink({bool isReady = false}) : _isReady = isReady;
+  RecordingEventSink({this._isReady = false});
 
   bool _isReady;
 

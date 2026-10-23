@@ -19,7 +19,6 @@
 /// at all, which is exactly what was reported.
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tapdesk_mobile/main.dart';

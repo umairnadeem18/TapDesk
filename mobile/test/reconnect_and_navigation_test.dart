@@ -22,9 +22,6 @@ import 'package:tapdesk_mobile/state/connection_controller.dart';
 import 'package:tapdesk_mobile/state/pairing_store.dart';
 import 'package:tapdesk_mobile/transport/event_sink.dart';
 import 'package:tapdesk_mobile/transport/pairing_payload.dart';
-import 'package:tapdesk_mobile/transport/session.dart';
-import 'package:tapdesk_mobile/transport/socket.dart';
-import 'package:tapdesk_mobile/transport/tapdesk_event.dart';
 
 void main() {
   group('the reconnect backoff actually reconnects', () {
