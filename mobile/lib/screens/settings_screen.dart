@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../state/settings.dart';
 import '../theme/tokens.dart';
+import '../ui/diagnostics_strip.dart';
 import '../ui/haptics.dart';
 
 /// The settings screen.
@@ -56,8 +57,7 @@ class SettingsScreen extends StatelessWidget {
                 TapDeskSpace.s6,
               ),
               children: [
-                _SectionLabel('This phone'),
-                _Card(children: [
+                _SectionLabel('This phone'),                _Card(children: [
                   _ToggleRow(
                     title: 'Haptic feedback',
                     subtitle:
@@ -130,6 +130,10 @@ class SettingsScreen extends StatelessWidget {
                 _Card(children: [
                   _ForgetRow(settings: settings),
                 ]),
+                const SizedBox(height: TapDeskSpace.s5),
+                // The same trace the pairing and controls screens show: a
+                // settings failure that lands here has a name here.
+                const DiagnosticsStrip(),
                 const SizedBox(height: TapDeskSpace.s5),
                 const _Diagnostics(),
               ],

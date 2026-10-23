@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'diagnostics.dart';
+
 /// What the computer is actually doing, as last reported by it.
 ///
 /// These are not the user's settings. They are the companion's, and the phone
@@ -191,14 +193,24 @@ class AppSettings extends ChangeNotifier {
   bool get isConnectedToComputer => _remote.known;
 
   /// Load stored preferences. Safe to call more than once.
+  ///
+  /// Failure-proof on purpose: opened settings that spin forever are worse
+  /// than controls built from defaults, and a broken preferences channel has
+  /// actually shipped (shared_preferences_android 2.5.0, release-mode only -
+  /// flutter/flutter#194649). A phone that cannot read its keys gets its
+  /// defaults and one named trace line, not a permanent spinner.
   Future<void> load() async {
     if (_loaded) return;
-    _haptics = await _storage.readBool(_kHaptics) ?? true;
-    _leftHanded = await _storage.readBool(_kLeftHanded) ?? false;
-    _keepAwake = await _storage.readBool(_kKeepAwake) ?? true;
-    _wantedCursorSpeed =
-        await _storage.readDouble(_kCursorSpeed) ?? 1.0;
-    _wantedAccel = await _storage.readDouble(_kAccel) ?? 1.6;
+    try {
+      _haptics = await _storage.readBool(_kHaptics) ?? true;
+      _leftHanded = await _storage.readBool(_kLeftHanded) ?? false;
+      _keepAwake = await _storage.readBool(_kKeepAwake) ?? true;
+      _wantedCursorSpeed =
+          await _storage.readDouble(_kCursorSpeed) ?? 1.0;
+      _wantedAccel = await _storage.readDouble(_kAccel) ?? 1.6;
+    } catch (error) {
+      trace.add('stored settings unreadable ($error); using defaults');
+    }
     _loaded = true;
     notifyListeners();
   }

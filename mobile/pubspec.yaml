@@ -4,7 +4,7 @@ publish_to: 'none'
 
 # Shown in the app store listing and in the website's download card.
 # Kept in step with docs/protocol.md; bump only with the protocol.
-version: 1.0.0+8
+version: 1.0.0+9
 
 environment:
   sdk: ^3.13.5
@@ -62,6 +62,15 @@ dev_dependencies:
 # just delete this and hope.
 dependency_overrides:
   path_provider_android: 2.2.23
+
+  # 2.5.0 looks up Kotlin classes by name through JNI (package:jni), and R8
+  # renames those classes in release builds - so every release-mode
+  # preferences call throws NoSuchMethodError at getAll, which on the phone
+  # took Settings (spinner forever) and the pairing store down with it.
+  # flutter/flutter#194649. 2.4.28 is the last version before the JNI
+  # backend, and still receives updates: unpin once that issue ships a fix
+  # and re-verify with `flutter build apk --release`.
+  shared_preferences_android: 2.4.28
 
 flutter:
   uses-material-design: true

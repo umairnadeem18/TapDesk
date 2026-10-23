@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'diagnostics.dart';
+
 import '../transport/pairing_payload.dart';
 
 /// A PC this phone has paired with before.
@@ -121,19 +123,29 @@ class PairingStore extends ChangeNotifier {
   PairedDevice? get mostRecent => _devices.isEmpty ? null : _devices.first;
 
   Future<void> load() async {
-    _prefs ??= await SharedPreferences.getInstance();
-    final raw = _prefs?.getStringList(_prefsKey) ?? const [];
-    _devices
-      ..clear()
-      ..addAll(raw
-          .map((e) {
-            try {
-              return PairedDevice.fromJson(jsonDecode(e) as Map<String, dynamic>);
-            } catch (_) {
-              return null;
-            }
-          })
-          .whereType<PairedDevice>());
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      final raw = _prefs?.getStringList(_prefsKey) ?? const [];
+      _devices
+        ..clear()
+        ..addAll(raw
+            .map((e) {
+              try {
+                return PairedDevice.fromJson(
+                    jsonDecode(e) as Map<String, dynamic>);
+              } catch (_) {
+                return null;
+              }
+            })
+            .whereType<PairedDevice>());
+    } catch (error) {
+      // A broken preferences channel must not take the pairing flow with it:
+      // an empty remembered list still pairs from a fresh scan, which is the
+      // whole handshake. Unreadable storage is a named failure, not a hang -
+      // shared_preferences_android 2.5.0 shipped exactly such a release-mode
+      // channel break (flutter/flutter#194649) and this survived it.
+      trace.add('stored pairings unreadable ($error); starting empty');
+    }
     _sort();
     notifyListeners();
   }
