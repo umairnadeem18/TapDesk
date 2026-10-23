@@ -116,6 +116,39 @@ Two defects ride along:
    whether `tool/probe_phone.dart` stays (then fix its import to `package:`)
    or gets deleted once pairing is proven fixed.
 
+## Resolution (2026-10-23, beta.7)
+
+The break was found and fixed in the same session. See commit `bb82bae`.
+
+**Root cause, one line:** the pairing callback was stranded behind the scanner
+screen's own lifecycle — `remember(payload)` notifies the store, the store
+rebuilds `_Root` while `_onDetect` is still inside remember's storage write,
+`_Root` swaps the scanner screen out for the AppShell, and the old code's
+`if (!mounted) return;` right after remember found the screen already replaced
+and returned. The callback was never called; not one byte left the phone.
+
+**The fix (`lib/screens/pairing_screen.dart` `_onDetect`):**
+- `store` and `onPaired` are captured **before any await**, into locals that stay
+  valid after the State is disposed.
+- remember() failures are traced and **continue** (non-fatal — the pairing
+  payload carries everything needed).
+- The haptic is `unawaited` — it can no longer block or strand the chain.
+- no-callback and spinner-endless paths handled (`_busy` reset, trace lines).
+- `_Root._onPaired` does not silently skip on a non-live sink; it traces.
+- `main()` installs `FlutterError.onError` and `PlatformDispatcher.onError`
+  handlers that `trace.add(...)` — release builds can no longer swallow an
+  error invisibly.
+
+**Result of the session:** `flutter analyze` 20 → **0 issues**; all 184 mobile
+tests pass; beta.7 published and wired into the website. After one fresh scan
+the strip should read `QR accepted → scanned: … token=yes → dialing → socket
+open → sent 2 frames → PC: hello_ok → PC: auth_pending` with the PC showing
+its approval dialog, then Connected.
+
+**Follow-up (non-blocking):** a regression widget test for the unmount-then-
+callback scenario (hard because the camera plugin must be stubbed); the
+remembered-reconnect path stays covered by the existing no-credential refusal.
+
 ## Tool-chain notes for whoever runs the next build
 
 - `flutter test` needs TapDesk.exe killed first (cross-implementation tests bind
